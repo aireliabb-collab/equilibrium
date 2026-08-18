@@ -1,477 +1,401 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-<meta charset="UTF-8" />
-<!-- 防快取機制：強制 Safari 每次向伺服器確認更新 -->
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-<meta http-equiv="Pragma" content="no-cache" />
-<meta http-equiv="Expires" content="0" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>Equilibrium 核心追蹤系統</title>
-<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
-<script src="https://cdn.tailwindcss.com"></script>
-<style>
-  body { font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", sans-serif; -webkit-tap-highlight-color: transparent; }
-  input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.7; cursor: pointer; }
-  ::-webkit-scrollbar { display: none; }
-  .safe-bottom { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Equilibrium 核心追蹤系統</title>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", sans-serif; -webkit-tap-highlight-color: transparent; background-color: #0c0a09; color: #f5f5f4; }
+    ::-webkit-scrollbar { display: none; }
+    .safe-bottom { padding-bottom: calc(75px + env(safe-area-inset-bottom)); }
+    .calm-card { background: linear-gradient(145deg, #1c1917 0%, #12100e 100%); border: 1px solid rgba(41, 37, 36, 0.8); }
+    .calm-input { background-color: #171513; border: 1px solid #292524; color: #e7e5e4; }
+    .calm-input:focus { border-color: #57534e; outline: none; }
+  </style>
 </head>
-<body class="bg-zinc-950 text-zinc-100 min-h-screen selection:bg-emerald-500/30">
-<div id="root"></div>
+<body class="min-h-screen">
+  <div id="root"></div>
 
-<script type="text/babel">
-const { useState, useEffect, useMemo } = React;
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
 
-// --- 資料庫與預設設定 ---
-const STORAGE_KEYS = {
-  weight: "eq_weight_history",
-  nutrition: "eq_nutrition_data",
-  nutritionTarget: "eq_nutrition_target",
-  workouts: "eq_workouts_data",
-  customWorkouts: "eq_custom_workouts"
-};
+    const STORAGE_KEYS = {
+      weight: "eq_weight_history",
+      nutrition: "eq_nutrition_data",
+      workouts: "eq_workouts_data",
+      customWorkouts: "eq_custom_workouts"
+    };
 
-const DEFAULT_WORKOUT_DB = {
-  "推 (Push)": ["槓鈴臥推", "啞鈴臥推", "上斜啞鈴推舉", "坐姿啞鈴肩推", "側平舉", "三頭肌下壓", "雙槓臂屈伸"],
-  "拉 (Pull)": ["引體上升", "槓鈴划船", "滑輪下拉", "坐姿划船", "面拉", "二頭肌彎舉", "啞鈴單臂划船"],
-  "腿 (Legs)": ["深蹲", "羅馬尼亞硬舉", "保加利亞單腿蹲", "腿舉 (Leg Press)", "腿屈伸", "腿彎舉", "站姿提踵"],
-  "核心與其他": ["捲腹", "懸垂舉腿", "健腹輪", "平板支撐"]
-};
+    const LOCAL_FOOD_DB = {
+      "肉類": [
+        { name: "雞胸肉", p: 23, c: 0, f: 2, unit: "g" },
+        { name: "雞腿肉", p: 20, c: 0, f: 8, unit: "g" },
+        { name: "牛扒", p: 24, c: 0, f: 8, unit: "g" },
+        { name: "瘦牛肉", p: 26, c: 0, f: 5, unit: "g" },
+        { name: "豬扒 (瘦)", p: 22, c: 0, f: 6, unit: "g" },
+        { name: "三文魚", p: 20, c: 0, f: 13, unit: "g" },
+        { name: "蝦", p: 20, c: 0, f: 1, unit: "g" },
+        { name: "雞蛋", p: 6.3, c: 0.6, f: 4.8, unit: "隻" },
+        { name: "鴨胸肉", p: 19, c: 0, f: 12, unit: "g" },
+        { name: "鯇魚", p: 18, c: 0, f: 3, unit: "g" },
+        { name: "瘦羊肉", p: 25, c: 0, f: 8, unit: "g" },
+        { name: "雞柳", p: 22, c: 0, f: 1, unit: "g" },
+        { name: "吞拿魚(罐)", p: 24, c: 0, f: 1, unit: "g" }
+      ],
+      "蔬菜": [
+        { name: "西蘭花", p: 3, c: 5, f: 0.3, unit: "g" },
+        { name: "菜心", p: 2, c: 3, f: 0.2, unit: "g" },
+        { name: "芥蘭", p: 2, c: 4, f: 0.3, unit: "g" },
+        { name: "生菜", p: 1, c: 2, f: 0.2, unit: "g" },
+        { name: "番茄", p: 0.9, c: 3.9, f: 0.2, unit: "g" },
+        { name: "蘑菇", p: 3, c: 3, f: 0.3, unit: "g" },
+        { name: "青瓜", p: 0.6, c: 3, f: 0.1, unit: "g" }
+      ]
+    };
 
-// 工具函數
-const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
-const loadJSON = (key, fallback) => { try { const r = localStorage.getItem(key); return r ? JSON.parse(r) : fallback; } catch (e) { return fallback; } };
-const saveJSON = (key, val) => localStorage.setItem(key, JSON.stringify(val));
-const round1 = (n) => Math.round(n * 10) / 10;
-const calcKcal = (p, c, f) => (p * 4) + (c * 4) + (f * 9);
+    const DEFAULT_WORKOUT_DB = {
+      "推 (Push)": ["槓鈴臥推", "啞鈴臥推", "上斜啞鈴推舉", "坐姿啞鈴肩推", "側平舉", "三頭肌下壓"],
+      "拉 (Pull)": ["引體上升", "槓鈴划船", "滑輪下拉", "坐姿划船", "面拉", "二頭肌彎舉"],
+      "腿 (Legs)": ["深蹲", "羅馬尼亞硬舉", "保加利亞單腿蹲", "腿舉 (Leg Press)", "腿屈伸"],
+      "核心": ["捲腹", "懸垂舉腿", "健腹輪", "平板支撐"]
+    };
 
-// 生成下拉選單選項陣列
-const weightOptions = Array.from({length: 401}, (_, i) => i * 0.5); // 0.0 到 200.0 kg
-const repsOptions = Array.from({length: 50}, (_, i) => i + 1); // 1 到 50 次
-const setsOptions = Array.from({length: 10}, (_, i) => i + 1); // 1 到 10 組
+    const QUOTES = [
+      "每一小步的穩定累積，都是對未來的精準佈局。",
+      "不需要完美，只需要比昨天更清楚自己在做什麼。",
+      "真正的秩序來自於日常微小而堅定的執行。",
+      "把複雜的事情簡單做，簡單的事情重複做。",
+      "專注於過程本身，結果只是自然而然的副產品。"
+    ];
 
-// --- 自訂 SVG 趨勢圖表組件 ---
-function TrendChart({ data, xKey, yKey, color = "#10b981", formatY = (v) => v }) {
-  if (!data || data.length === 0) return <div className="h-40 flex items-center justify-center text-xs text-zinc-600 border border-zinc-800 rounded-xl bg-zinc-900/50">無足夠資料產生趨勢</div>;
-  if (data.length === 1) return <div className="h-40 flex items-center justify-center text-xs text-zinc-500 border border-zinc-800 rounded-xl bg-zinc-900/50">單筆資料：{formatY(data[0][yKey])}</div>;
+    const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+    const loadJSON = (key, fallback) => { try { const r = localStorage.getItem(key); return r ? JSON.parse(r) : fallback; } catch (e) { return fallback; } };
+    const saveJSON = (key, val) => localStorage.setItem(key, JSON.stringify(val));
+    const round1 = (n) => Math.round(n * 10) / 10;
+    const calcKcal = (p, c, f) => (p * 4) + (c * 4) + (f * 9);
 
-  const padding = { top: 20, bottom: 20, left: 10, right: 10 };
-  const width = 400; const height = 160;
-  const values = data.map(d => d[yKey]);
-  const minVal = Math.min(...values); const maxVal = Math.max(...values);
-  const range = maxVal - minVal === 0 ? 1 : maxVal - minVal;
+    const weightOptions = Array.from({length: 401}, (_, i) => i * 0.5);
+    const repsOptions = Array.from({length: 50}, (_, i) => i + 1);
+    const setsOptions = Array.from({length: 10}, (_, i) => i + 1);
 
-  const points = data.map((d, i) => {
-    const x = padding.left + (i / (data.length - 1)) * (width - padding.left - padding.right);
-    const y = height - padding.bottom - ((d[yKey] - minVal) / range) * (height - padding.top - padding.bottom);
-    return `${x},${y}`;
-  }).join(" ");
+    function TrendChart({ data, yKey, color = "#d6d3d1", formatY = (v) => v }) {
+      if (!data || data.length === 0) return <div className="h-28 flex items-center justify-center text-[11px] text-stone-600 calm-card rounded-lg">尚無足夠軌跡紀錄</div>;
+      if (data.length === 1) return <div className="h-28 flex items-center justify-center text-[11px] text-stone-500 calm-card rounded-lg">目前基準：{formatY(data[0][yKey])}</div>;
 
-  return (
-    <div className="relative w-full overflow-hidden border border-zinc-800 rounded-xl bg-zinc-900/30 pt-2">
-      <div className="absolute top-2 left-3 text-[10px] text-zinc-500 font-medium tracking-wider">MAX: {formatY(maxVal)}</div>
-      <div className="absolute bottom-2 left-3 text-[10px] text-zinc-500 font-medium tracking-wider">MIN: {formatY(minVal)}</div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-40">
-        <polyline points={points} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-        {data.map((d, i) => {
-          const x = padding.left + (i / (data.length - 1)) * (width - padding.left - padding.right);
-          const y = height - padding.bottom - ((d[yKey] - minVal) / range) * (height - padding.top - padding.bottom);
-          return <circle key={i} cx={x} cy={y} r="4" fill="#09090b" stroke={color} strokeWidth="2" />;
-        })}
-      </svg>
-    </div>
-  );
-}
+      const padding = { top: 12, bottom: 12, left: 8, right: 8 };
+      const width = 400; const height = 110;
+      const values = data.map(d => d[yKey]);
+      const minVal = Math.min(...values); const maxVal = Math.max(...values);
+      const range = maxVal - minVal === 0 ? 1 : maxVal - minVal;
 
-// --- 主要系統組件 ---
-function App() {
-  const [activeTab, setActiveTab] = useState("dashboard");
-  const [selectedDate, setSelectedDate] = useState(todayStr());
+      const points = data.map((d, i) => {
+        const x = padding.left + (i / (data.length - 1)) * (width - padding.left - padding.right);
+        const y = height - padding.bottom - ((d[yKey] - minVal) / range) * (height - padding.top - padding.bottom);
+        return `${x},${y}`;
+      }).join(" ");
 
-  // 狀態管理
-  const [weightHistory, setWeightHistory] = useState(() => loadJSON(STORAGE_KEYS.weight, {}));
-  const [nutritionTarget, setNutritionTarget] = useState(() => loadJSON(STORAGE_KEYS.nutritionTarget, { p: 150, c: 200, f: 60 }));
-  const [nutritionData, setNutritionData] = useState(() => loadJSON(STORAGE_KEYS.nutrition, {}));
-  const [workoutsData, setWorkoutsData] = useState(() => loadJSON(STORAGE_KEYS.workouts, {}));
-  const [customWorkouts, setCustomWorkouts] = useState(() => loadJSON(STORAGE_KEYS.customWorkouts, { "推 (Push)": [], "拉 (Pull)": [], "腿 (Legs)": [], "核心與其他": [] }));
-
-  // 自動儲存
-  useEffect(() => saveJSON(STORAGE_KEYS.weight, weightHistory), [weightHistory]);
-  useEffect(() => saveJSON(STORAGE_KEYS.nutritionTarget, nutritionTarget), [nutritionTarget]);
-  useEffect(() => saveJSON(STORAGE_KEYS.nutrition, nutritionData), [nutritionData]);
-  useEffect(() => saveJSON(STORAGE_KEYS.workouts, workoutsData), [workoutsData]);
-  useEffect(() => saveJSON(STORAGE_KEYS.customWorkouts, customWorkouts), [customWorkouts]);
-
-  // --- 模組：體重輸入卡片 ---
-  const WeightCard = () => {
-    const todayWeight = weightHistory[selectedDate] || (() => {
-      const dates = Object.keys(weightHistory).sort();
-      return dates.length > 0 ? weightHistory[dates[dates.length - 1]] : 70.0;
-    })();
-
-    const handleAdjust = (delta) => setWeightHistory(p => ({ ...p, [selectedDate]: Math.max(0, round1(todayWeight + delta)) }));
-
-    return (
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 flex flex-col items-center">
-        <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2 self-start">今日體重記錄</h2>
-        <div className="text-5xl font-bold tabular-nums tracking-tight text-emerald-400 mb-4 mt-2">
-          {todayWeight.toFixed(1)} <span className="text-xl text-zinc-600">kg</span>
+      return (
+        <div className="relative w-full overflow-hidden calm-card rounded-lg pt-1">
+          <div className="absolute top-1 left-2 text-[9px] text-stone-500 font-mono">高: {formatY(maxVal)} | 低: {formatY(minVal)}</div>
+          <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-28">
+            <polyline points={points} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.8" />
+            {data.map((d, i) => {
+              const x = padding.left + (i / (data.length - 1)) * (width - padding.left - padding.right);
+              const y = height - padding.bottom - ((d[yKey] - minVal) / range) * (height - padding.top - padding.bottom);
+              return <circle key={i} cx={x} cy={y} r="2.5" fill="#1c1917" stroke={color} strokeWidth="1.5" />;
+            })}
+          </svg>
         </div>
-        <div className="grid grid-cols-6 gap-2 w-full">
-          {[-1.0, -0.5, -0.1, +0.1, +0.5, +1.0].map(val => (
-            <button key={val} onClick={() => handleAdjust(val)}
-              className={`py-3 rounded-lg text-sm font-bold transition active:scale-95 border ${val > 0 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'}`}>
-              {val > 0 ? `+${val}` : val}
-            </button>
-          ))}
-        </div>
-      </div>
-    );
-  };
+      );
+    }
 
-  // --- 分頁 1：總覽 ---
-  const Dashboard = () => {
-    const [weightRange, setWeightRange] = useState(30);
-    const [workoutMetric, setWorkoutMetric] = useState("weight");
-    
-    const allExercises = useMemo(() => {
-      const exSet = new Set();
-      Object.values(workoutsData).forEach(dayArr => dayArr.forEach(w => exSet.add(w.name)));
-      return Array.from(exSet);
-    }, [workoutsData]);
-    
-    const [selectedExercise, setSelectedExercise] = useState(allExercises[0] || "");
+    function App() {
+      const [activeTab, setActiveTab] = useState("dashboard");
+      const [selectedDate, setSelectedDate] = useState(todayStr());
+      const dailyQuote = useMemo(() => QUOTES[Math.abs(selectedDate.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % QUOTES.length], [selectedDate]);
 
-    const weightChartData = useMemo(() => {
-      const cutoff = new Date().getTime() - (weightRange * 24 * 60 * 60 * 1000);
-      return Object.entries(weightHistory).filter(([d]) => new Date(d).getTime() >= cutoff).sort((a, b) => a[0].localeCompare(b[0])).map(([date, weight]) => ({ date, weight }));
-    }, [weightHistory, weightRange]);
+      const [weightHistory, setWeightHistory] = useState(() => loadJSON(STORAGE_KEYS.weight, {}));
+      const [nutritionData, setNutritionData] = useState(() => loadJSON(STORAGE_KEYS.nutrition, {}));
+      const [workoutsData, setWorkoutsData] = useState(() => loadJSON(STORAGE_KEYS.workouts, {}));
+      const [customWorkouts, setCustomWorkouts] = useState(() => loadJSON(STORAGE_KEYS.customWorkouts, { "推 (Push)": [], "拉 (Pull)": [], "腿 (Legs)": [], "核心": [] }));
 
-    const workoutChartData = useMemo(() => {
-      if (!selectedExercise) return [];
-      const history = [];
-      Object.entries(workoutsData).sort((a, b) => a[0].localeCompare(b[0])).forEach(([date, wArr]) => {
-        const matches = wArr.filter(w => w.name === selectedExercise);
-        if (matches.length > 0) {
-          history.push({ 
-            date, 
-            maxWeight: Math.max(...matches.map(m => m.weight)), 
-            totalVolume: matches.reduce((acc, m) => acc + (m.weight * m.reps * m.sets), 0) 
-          });
-        }
-      });
-      return history;
-    }, [workoutsData, selectedExercise]);
+      useEffect(() => saveJSON(STORAGE_KEYS.weight, weightHistory), [weightHistory]);
+      useEffect(() => saveJSON(STORAGE_KEYS.nutrition, nutritionData), [nutritionData]);
+      useEffect(() => saveJSON(STORAGE_KEYS.workouts, workoutsData), [workoutsData]);
+      useEffect(() => saveJSON(STORAGE_KEYS.customWorkouts, customWorkouts), [customWorkouts]);
 
-    const todayNutri = nutritionData[selectedDate] || [];
-    const sumP = todayNutri.reduce((acc, i) => acc + i.p, 0);
-    const sumC = todayNutri.reduce((acc, i) => acc + i.c, 0);
-    const sumF = todayNutri.reduce((acc, i) => acc + i.f, 0);
-    const sumKcal = calcKcal(sumP, sumC, sumF);
-    const targetKcal = calcKcal(nutritionTarget.p, nutritionTarget.c, nutritionTarget.f);
+      const Dashboard = () => {
+        const [weightRange, setWeightRange] = useState(30);
+        const todayWeight = weightHistory[selectedDate] || (() => {
+          const dates = Object.keys(weightHistory).sort();
+          return dates.length > 0 ? weightHistory[dates[dates.length - 1]] : 70.0;
+        })();
 
-    return (
-      <div className="space-y-6">
-        <WeightCard />
+        const handleAdjust = (delta) => setWeightHistory(p => ({ ...p, [selectedDate]: Math.max(0, round1(todayWeight + delta)) }));
 
-        <section>
-          <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-3">今日飲食攝取</h2>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
-            <div className="flex justify-between items-end mb-2">
+        const weightChartData = useMemo(() => {
+          const cutoff = new Date().getTime() - (weightRange * 24 * 60 * 60 * 1000);
+          return Object.entries(weightHistory).filter(([d]) => new Date(d).getTime() >= cutoff).sort((a, b) => a[0].localeCompare(b[0])).map(([date, weight]) => ({ date, weight }));
+        }, [weightHistory, weightRange]);
+
+        const todayNutri = nutritionData[selectedDate] || [];
+        const sumP = todayNutri.reduce((acc, i) => acc + i.p, 0);
+        const sumC = todayNutri.reduce((acc, i) => acc + i.c, 0);
+        const sumF = todayNutri.reduce((acc, i) => acc + i.f, 0);
+        const sumKcal = calcKcal(sumP, sumC, sumF);
+
+        return (
+          <div className="space-y-3 pb-4">
+            <div className="calm-card rounded-xl p-3 border-stone-800/60 bg-stone-900/40">
+              <p className="text-[11px] text-stone-400 italic">“ {dailyQuote} ”</p>
+            </div>
+
+            <div className="calm-card rounded-xl p-3 flex items-center justify-between">
               <div>
-                <p className="text-[10px] text-zinc-500 font-medium">總熱量 (kcal)</p>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-2xl font-bold text-zinc-100">{round1(sumKcal)}</span>
-                  <span className="text-xs text-zinc-500">/ {round1(targetKcal)}</span>
-                </div>
+                <span className="text-[10px] text-stone-400 uppercase tracking-wider block">今日體重基準</span>
+                <span className="text-2xl font-bold font-mono text-stone-200">{todayWeight.toFixed(1)} <span className="text-xs text-stone-500 font-sans">kg</span></span>
+              </div>
+              <div className="grid grid-cols-6 gap-1">
+                {[-1.0, -0.5, -0.1, +0.1, +0.5, +1.0].map(val => (
+                  <button key={val} onClick={() => handleAdjust(val)}
+                    className={`px-2 py-1.5 rounded text-[11px] font-bold active:scale-95 border transition ${val > 0 ? 'bg-stone-800/60 text-stone-300 border-stone-700/60 hover:bg-stone-800' : 'bg-stone-900/60 text-stone-400 border-stone-800 hover:bg-stone-900'}`}>
+                    {val > 0 ? `+${val}` : val}
+                  </button>
+                ))}
               </div>
             </div>
-            <div className="h-2 w-full bg-zinc-800 rounded-full overflow-hidden mb-5">
-              <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${Math.min(100, (sumKcal / targetKcal) * 100)}%` }}></div>
+
+            <div className="calm-card rounded-xl p-3">
+              <div className="flex justify-between items-center mb-1.5">
+                <span className="text-[10px] text-stone-400 uppercase tracking-wider">今日營養累積</span>
+                <span className="text-xs font-mono font-bold text-stone-300">{round1(sumKcal)} <span className="text-[10px] text-stone-500">kcal</span></span>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-[11px]">
+                <div className="bg-stone-950/40 p-2 rounded-lg border border-stone-900"><span className="text-stone-500 block text-[9px]">蛋白質 (P)</span><span className="font-mono font-bold text-stone-300">{round1(sumP)}g</span></div>
+                <div className="bg-stone-950/40 p-2 rounded-lg border border-stone-900"><span className="text-stone-500 block text-[9px]">碳水 (C)</span><span className="font-mono font-bold text-stone-400">{round1(sumC)}g</span></div>
+                <div className="bg-stone-950/40 p-2 rounded-lg border border-stone-900"><span className="text-stone-500 block text-[9px]">脂肪 (F)</span><span className="font-mono font-bold text-stone-500">{round1(sumF)}g</span></div>
+              </div>
             </div>
-            <div className="grid grid-cols-3 gap-4">
-              {[{ label: "蛋白質", current: sumP, target: nutritionTarget.p, color: "bg-blue-400", textColor: "text-blue-400" },
-                { label: "碳水", current: sumC, target: nutritionTarget.c, color: "bg-amber-400", textColor: "text-amber-400" },
-                { label: "脂肪", current: sumF, target: nutritionTarget.f, color: "bg-rose-400", textColor: "text-rose-400" }
-              ].map(mac => (
-                <div key={mac.label}>
-                  <div className="flex justify-between text-[10px] mb-1">
-                    <span className="text-zinc-400">{mac.label}</span>
-                    <span className={mac.textColor}>{round1(mac.current)} <span className="text-zinc-600">/ {mac.target}g</span></span>
+
+            <div className="calm-card rounded-xl p-3">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-[10px] text-stone-400 uppercase tracking-wider">體重軌跡</span>
+                <div className="flex gap-1">
+                  {[7, 30, 90].map(days => (
+                    <button key={days} onClick={() => setWeightRange(days)} className={`px-2 py-0.5 rounded text-[10px] font-medium border transition ${weightRange === days ? 'bg-stone-800 text-stone-200 border-stone-700' : 'bg-transparent text-stone-500 border-transparent'}`}>
+                      {days === 7 ? '近週' : days === 30 ? '近月' : '近季'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <TrendChart data={weightChartData} yKey="weight" formatY={v => `${v}kg`} />
+            </div>
+          </div>
+        );
+      };
+
+      const NutritionInput = () => {
+        const [searchTerm, setSearchTerm] = useState("");
+        const [selectedFood, setSelectedFood] = useState(LOCAL_FOOD_DB["肉類"][0]);
+        const [amount, setAmount] = useState(100);
+
+        const allFoods = useMemo(() => [...LOCAL_FOOD_DB["肉類"], ...LOCAL_FOOD_DB["蔬菜"]], []);
+        const suggestions = useMemo(() => {
+          if (!searchTerm) return [];
+          return allFoods.filter(f => f.name.includes(searchTerm));
+        }, [searchTerm]);
+
+        const handleAdd = () => {
+          const ratio = selectedFood.unit === "g" ? amount / 100 : amount;
+          const newItem = {
+            id: Date.now(),
+            name: `${selectedFood.name} (${amount}${selectedFood.unit})`,
+            p: round1(selectedFood.p * ratio),
+            c: round1(selectedFood.c * ratio),
+            f: round1(selectedFood.f * ratio),
+            kcal: round1(calcKcal(selectedFood.p * ratio, selectedFood.c * ratio, selectedFood.f * ratio))
+          };
+          setNutritionData(p => ({ ...p, [selectedDate]: [...(p[selectedDate] || []), newItem] }));
+          setSearchTerm("");
+        };
+
+        const todayItems = nutritionData[selectedDate] || [];
+
+        return (
+          <div className="space-y-3 pb-4">
+            <div className="calm-card rounded-xl p-3 space-y-2.5 relative">
+              <div className="relative">
+                <input 
+                  type="text" 
+                  placeholder="搜尋食物 (如: 雞胸, 牛扒...)" 
+                  value={searchTerm} 
+                  onChange={e => setSearchTerm(e.target.value)}
+                  className="w-full calm-input p-2.5 rounded-lg text-xs text-stone-200"
+                />
+                {suggestions.length > 0 && (
+                  <div className="absolute left-0 right-0 z-20 bg-stone-900 border border-stone-800 rounded-lg max-h-36 overflow-y-auto shadow-2xl mt-1">
+                    {suggestions.map(f => (
+                      <div key={f.name} onClick={() => { setSelectedFood(f); setSearchTerm(f.name); }} className="p-2.5 text-xs cursor-pointer hover:bg-stone-800 border-b border-stone-800/50 last:border-0 text-stone-300">
+                        {f.name} <span className="text-[10px] text-stone-500 ml-1">({f.unit})</span>
+                      </div>
+                    ))}
                   </div>
-                  <div className="h-1 w-full bg-zinc-800 rounded-full overflow-hidden">
-                    <div className={`h-full ${mac.color} rounded-full`} style={{ width: `${Math.min(100, (mac.current / mac.target) * 100)}%` }}></div>
+                )}
+              </div>
+
+              <div className="flex gap-2">
+                <input 
+                  type="number" 
+                  value={amount} 
+                  onChange={e => setAmount(Number(e.target.value))} 
+                  placeholder={selectedFood.unit === "g" ? "重量 (g)" : "數量 (隻)"} 
+                  className="w-2/3 calm-input p-2.5 rounded-lg text-xs font-mono" 
+                />
+                <button onClick={handleAdd} className="w-1/3 bg-stone-200 text-stone-950 font-bold py-2.5 rounded-lg text-xs active:scale-95 transition hover:bg-white">加入紀錄</button>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              {todayItems.map(item => (
+                <div key={item.id} className="calm-card rounded-lg p-2.5 flex justify-between items-center text-xs">
+                  <div>
+                    <span className="font-bold text-stone-300 block">{item.name}</span>
+                    <span className="text-[10px] text-stone-500 font-mono">P:{item.p}g | C:{item.c}g | F:{item.f}g ➔ {item.kcal} kcal</span>
                   </div>
+                  <button onClick={() => setNutritionData(p => ({ ...p, [selectedDate]: p[selectedDate].filter(i => i.id !== item.id) }))} className="text-stone-600 hover:text-stone-400 p-1 text-xs transition">✕</button>
                 </div>
               ))}
+              {todayItems.length === 0 && <div className="text-center text-[11px] text-stone-600 py-6">此日尚未填寫飲食紀錄</div>}
             </div>
           </div>
-        </section>
+        );
+      };
 
-        <section>
-          <div className="flex justify-between items-center mb-3">
-            <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">體重趨勢</h2>
-            <select value={weightRange} onChange={(e) => setWeightRange(Number(e.target.value))} className="bg-zinc-900 border border-zinc-700 text-xs rounded-lg px-2 py-1 outline-none">
-              <option value={7}>一星期</option><option value={30}>一個月</option><option value={90}>三個月</option><option value={180}>半年</option><option value={365}>一年</option>
-            </select>
-          </div>
-          <TrendChart data={weightChartData} xKey="date" yKey="weight" formatY={v => `${v} kg`} />
-        </section>
+      const WorkoutInput = () => {
+        const categories = Object.keys(DEFAULT_WORKOUT_DB);
+        const [category, setCategory] = useState(categories[0]);
+        const currentExercises = [...DEFAULT_WORKOUT_DB[category], ...(customWorkouts[category] || [])];
+        const [exercise, setExercise] = useState(currentExercises[0]);
+        const [newCustomName, setNewCustomName] = useState("");
 
-        <section>
-          <div className="flex justify-between items-center mb-3">
-            <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">動作進步趨勢</h2>
-          </div>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
-            <div className="grid grid-cols-2 gap-2 mb-4">
-              <select value={selectedExercise} onChange={(e) => setSelectedExercise(e.target.value)} className="bg-zinc-800 border border-zinc-700 text-xs rounded-lg px-2 py-2 outline-none w-full">
-                {allExercises.length === 0 ? <option value="">無訓練紀錄</option> : allExercises.map(ex => <option key={ex} value={ex}>{ex}</option>)}
-              </select>
-              <select value={workoutMetric} onChange={(e) => setWorkoutMetric(e.target.value)} className="bg-zinc-800 border border-zinc-700 text-xs rounded-lg px-2 py-2 outline-none w-full">
-                <option value="weight">最大重量 (Max Weight)</option>
-                <option value="totalVolume">總容量 (Volume)</option>
-              </select>
-            </div>
-            <TrendChart data={workoutChartData} xKey="date" yKey={workoutMetric === "weight" ? "maxWeight" : "totalVolume"} color={workoutMetric === "weight" ? "#f59e0b" : "#8b5cf6"} formatY={v => `${v} kg`} />
-          </div>
-        </section>
-      </div>
-    );
-  };
+        const [weight, setWeight] = useState(20);
+        const [reps, setReps] = useState(10);
+        const [sets, setSets] = useState(3);
 
-  // --- 分頁 2：飲食輸入與 Open Food Facts 搜尋 ---
-  const NutritionInput = () => {
-    const [name, setName] = useState("");
-    const [amount, setAmount] = useState("100"); // 預設份量數值
-    const [p, setP] = useState(""); const [c, setC] = useState(""); const [f, setF] = useState("");
-    const [isSearching, setIsSearching] = useState(false);
+        useEffect(() => {
+          const merged = [...DEFAULT_WORKOUT_DB[category], ...(customWorkouts[category] || [])];
+          setExercise(merged[0] || "");
+        }, [category]);
 
-    const handleSearchOFF = async () => {
-      if (!name) return alert("請輸入食物名稱 (建議輸入英文，如: chicken breast)");
-      
-      setIsSearching(true);
-      try {
-        const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(name)}&search_simple=1&action=process&json=1`;
-        const res = await fetch(url);
-        const data = await res.json();
+        const handleAdd = () => {
+          let finalName = exercise;
+          if (exercise === "__custom__") {
+            finalName = newCustomName.trim();
+            if (!finalName) return;
+            setCustomWorkouts(prev => ({ ...prev, [category]: [...(prev[category] || []), finalName] }));
+            setExercise(finalName);
+            setNewCustomName("");
+          }
 
-        if (data.products && data.products.length > 0) {
-          const product = data.products[0];
-          const nut = product.nutriments || {};
-          
-          // Open Food Facts 預設提供每 100g 的數值
-          const p100 = nut['proteins_100g'] || 0;
-          const c100 = nut['carbohydrates_100g'] || 0;
-          const f100 = nut['fat_100g'] || 0;
+          const newItem = { id: Date.now(), category, name: finalName, weight: parseFloat(weight), reps: parseInt(reps), sets: parseInt(sets) };
+          setWorkoutsData(prev => ({ ...prev, [selectedDate]: [...(prev[selectedDate] || []), newItem] }));
+        };
 
-          // 根據使用者輸入的重量進行比例換算 (預設基數為 100g)
-          const ratio = (parseFloat(amount) || 100) / 100;
-          setP(round1(p100 * ratio));
-          setC(round1(c100 * ratio));
-          setF(round1(f100 * ratio));
-        } else {
-          alert("在 Open Food Facts 找不到該食物，請嘗試輸入英文或自行手動填寫數值。");
-        }
-      } catch (err) {
-        alert("連線至 Open Food Facts 失敗，請檢查網路。");
-        console.error(err);
-      } finally {
-        setIsSearching(false);
-      }
-    };
+        const todayItems = workoutsData[selectedDate] || [];
 
-    const handleAdd = () => {
-      const pv = parseFloat(p)||0; const cv = parseFloat(c)||0; const fv = parseFloat(f)||0;
-      if (pv===0 && cv===0 && fv===0) return;
-      const finalTitle = `${name} (${amount}g)`.trim();
-      const newItem = { id: Date.now(), name: finalTitle, p: pv, c: cv, f: fv, kcal: calcKcal(pv, cv, fv) };
-      setNutritionData(prev => ({ ...prev, [selectedDate]: [...(prev[selectedDate]||[]), newItem] }));
-      setName(""); setAmount("100"); setP(""); setC(""); setF("");
-    };
-
-    const todayItems = nutritionData[selectedDate] || [];
-
-    return (
-      <div className="space-y-6">
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-3">
-          <div className="flex justify-between items-center mb-1">
-            <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">全球開放資料庫查詢 (Open Food Facts)</h3>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <input type="text" placeholder="食物名稱 (建議英文如: chicken breast)" value={name} onChange={e=>setName(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-sm outline-none focus:border-emerald-500" />
-            <input type="number" placeholder="重量 (g)" value={amount} onChange={e=>setAmount(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-sm outline-none focus:border-emerald-500" />
-          </div>
-          <button onClick={handleSearchOFF} disabled={isSearching} className={`w-full font-bold px-4 py-2 rounded-xl text-sm transition ${isSearching ? 'bg-zinc-700 text-zinc-500' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30'}`}>
-            {isSearching ? "查詢中..." : "🔍 從全球資料庫自動帶入營養素"}
-          </button>
-          
-          <div className="grid grid-cols-3 gap-3 pt-2 border-t border-zinc-800 mt-2">
-            <div><label className="text-[10px] text-zinc-500 block mb-1">蛋白質 (g)</label><input type="number" placeholder="0" value={p} onChange={e=>setP(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none" /></div>
-            <div><label className="text-[10px] text-zinc-500 block mb-1">碳水 (g)</label><input type="number" placeholder="0" value={c} onChange={e=>setC(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none" /></div>
-            <div><label className="text-[10px] text-zinc-500 block mb-1">脂肪 (g)</label><input type="number" placeholder="0" value={f} onChange={e=>setF(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none" /></div>
-          </div>
-          <button onClick={handleAdd} className="w-full bg-emerald-500 text-zinc-950 font-bold px-4 py-3 rounded-xl text-sm active:scale-95 transition mt-2">加入飲食紀錄</button>
-        </div>
-
-        <ul className="space-y-2">
-          {todayItems.map(item => (
-            <li key={item.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 flex justify-between items-center">
-              <div>
-                <p className="text-sm font-bold text-zinc-200">{item.name}</p>
-                <p className="text-[11px] text-zinc-500 mt-0.5">P: {item.p}g | C: {item.c}g | F: {item.f}g ➔ {round1(item.kcal)} kcal</p>
+        return (
+          <div className="space-y-3 pb-4">
+            <div className="calm-card rounded-xl p-3 space-y-2.5">
+              <div className="grid grid-cols-2 gap-2">
+                <select value={category} onChange={e => setCategory(e.target.value)} className="calm-input p-2 rounded-lg text-xs">
+                  {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <select value={exercise} onChange={e => setExercise(e.target.value)} className="calm-input p-2 rounded-lg text-xs">
+                  {currentExercises.map(ex => <option key={ex} value={ex}>{ex}</option>)}
+                  <option value="__custom__">➕ 自訂...</option>
+                </select>
               </div>
-              <button onClick={() => setNutritionData(prev => ({ ...prev, [selectedDate]: prev[selectedDate].filter(i => i.id !== item.id) }))} className="text-zinc-600 hover:text-rose-400 p-2 text-xs">刪除</button>
-            </li>
-          ))}
-          {todayItems.length === 0 && <p className="text-center text-xs text-zinc-600 py-4">本日無紀錄</p>}
-        </ul>
-      </div>
-    );
-  };
 
-  // --- 分頁 3：訓練輸入 ---
-  const WorkoutInput = () => {
-    const categories = Object.keys(DEFAULT_WORKOUT_DB);
-    const [category, setCategory] = useState(categories[0]);
-    
-    const currentExercises = [...DEFAULT_WORKOUT_DB[category], ...(customWorkouts[category] || [])];
-    const [exercise, setExercise] = useState(currentExercises[0]);
-    const [newCustomName, setNewCustomName] = useState("");
+              {exercise === "__custom__" && (
+                <input type="text" placeholder="輸入自訂動作名稱" value={newCustomName} onChange={e=>setNewCustomName(e.target.value)} className="w-full calm-input p-2 rounded-lg text-xs" />
+              )}
 
-    const [weight, setWeight] = useState(20);
-    const [reps, setReps] = useState(10);
-    const [sets, setSets] = useState(3);
-
-    useEffect(() => {
-      const merged = [...DEFAULT_WORKOUT_DB[category], ...(customWorkouts[category] || [])];
-      setExercise(merged.length > 0 ? merged[0] : "__custom__");
-    }, [category, customWorkouts]);
-
-    const handleAdd = () => {
-      let finalName = exercise;
-      if (exercise === "__custom__") {
-        finalName = newCustomName.trim();
-        if (!finalName) return alert("請輸入自訂動作名稱");
-        setCustomWorkouts(prev => ({
-          ...prev,
-          [category]: [...(prev[category] || []), finalName]
-        }));
-        setExercise(finalName);
-        setNewCustomName("");
-      }
-
-      const newItem = { id: Date.now(), category, name: finalName, weight: parseFloat(weight), reps: parseInt(reps), sets: parseInt(sets) };
-      setWorkoutsData(prev => ({ ...prev, [selectedDate]: [...(prev[selectedDate]||[]), newItem] }));
-    };
-
-    const todayItems = workoutsData[selectedDate] || [];
-
-    return (
-      <div className="space-y-6">
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-[10px] text-zinc-500 block mb-1">分類</label>
-              <select value={category} onChange={e => setCategory(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm outline-none">
-                {categories.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-[10px] text-zinc-500 block mb-1">動作</label>
-              <select value={exercise} onChange={e => setExercise(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm outline-none">
-                {currentExercises.map(ex => <option key={ex} value={ex}>{ex}</option>)}
-                <option value="__custom__">➕ 新增自訂動作...</option>
-              </select>
-            </div>
-          </div>
-
-          {exercise === "__custom__" && (
-            <input type="text" placeholder="輸入新的動作名稱 (將永久儲存於此分類)" value={newCustomName} onChange={e=>setNewCustomName(e.target.value)} className="w-full bg-zinc-800 border border-emerald-500/50 rounded-xl px-3 py-2.5 text-sm outline-none" />
-          )}
-
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="text-[10px] text-zinc-500 block mb-1">重量 (kg)</label>
-              <select value={weight} onChange={e=>setWeight(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-2 py-2.5 text-sm outline-none">
-                {weightOptions.map(w => <option key={w} value={w}>{w}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-[10px] text-zinc-500 block mb-1">次數</label>
-              <select value={reps} onChange={e=>setReps(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-2 py-2.5 text-sm outline-none">
-                {repsOptions.map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-[10px] text-zinc-500 block mb-1">組數</label>
-              <select value={sets} onChange={e=>setSets(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-2 py-2.5 text-sm outline-none">
-                {setsOptions.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-          </div>
-          
-          <button onClick={handleAdd} className="w-full bg-emerald-500 text-zinc-950 font-bold px-4 py-3 rounded-xl text-sm active:scale-95 transition">加入訓練紀錄</button>
-        </div>
-
-        <ul className="space-y-2">
-          {todayItems.map(item => (
-            <li key={item.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 flex justify-between items-center">
-              <div>
-                <p className="text-sm font-bold text-zinc-200">{item.name}</p>
-                <p className="text-[11px] text-zinc-500 mt-0.5">{item.weight} kg × {item.reps} 次 × {item.sets} 組 <span className="ml-2 text-emerald-500">容量: {item.weight * item.reps * item.sets} kg</span></p>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <span className="text-[9px] text-stone-500 block mb-0.5">重量(kg)</span>
+                  <select value={weight} onChange={e=>setWeight(e.target.value)} className="w-full calm-input p-2 rounded-lg text-xs font-mono">
+                    {weightOptions.map(w => <option key={w} value={w}>{w}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <span className="text-[9px] text-stone-500 block mb-0.5">次數</span>
+                  <select value={reps} onChange={e=>setReps(e.target.value)} className="w-full calm-input p-2 rounded-lg text-xs font-mono">
+                    {repsOptions.map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <span className="text-[9px] text-stone-500 block mb-0.5">組數</span>
+                  <select value={sets} onChange={e=>setSets(e.target.value)} className="w-full calm-input p-2 rounded-lg text-xs font-mono">
+                    {setsOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
               </div>
-              <button onClick={() => setWorkoutsData(prev => ({ ...prev, [selectedDate]: prev[selectedDate].filter(i => i.id !== item.id) }))} className="text-zinc-600 hover:text-rose-400 p-2 text-xs">刪除</button>
-            </li>
-          ))}
-          {todayItems.length === 0 && <p className="text-center text-xs text-zinc-600 py-4">本日無紀錄</p>}
-        </ul>
-      </div>
-    );
-  };
 
-  // --- 分頁 4：設定 ---
-  const Settings = () => (
-    <div className="space-y-6">
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
-        <h2 className="text-sm font-bold text-zinc-200 mb-2">系統設定</h2>
-        <p className="text-xs text-zinc-500">目前飲食搜尋已切換至 Open Food Facts 全球公開資料庫，無需設定任何 API Key。</p>
-      </div>
-    </div>
-  );
+              <button onClick={handleAdd} className="w-full bg-stone-200 text-stone-950 font-bold py-2.5 rounded-lg text-xs active:scale-95 transition hover:bg-white">記錄訓練</button>
+            </div>
 
-  return (
-    <div className="max-w-md mx-auto min-h-screen relative bg-zinc-950">
-      <header className="sticky top-0 z-10 bg-zinc-950/80 backdrop-blur-md px-4 py-4 border-b border-zinc-900 flex justify-between items-center">
-        <h1 className="text-lg font-bold tracking-tight text-zinc-100">Eq.<span className="text-emerald-400">Track</span></h1>
-        <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1.5 text-xs text-zinc-300 outline-none focus:border-emerald-500" />
-      </header>
+            <div className="space-y-1.5">
+              {todayItems.map(item => (
+                <div key={item.id} className="calm-card rounded-lg p-2.5 flex justify-between items-center text-xs">
+                  <div>
+                    <span className="font-bold text-stone-300 block">{item.name}</span>
+                    <span className="text-[10px] text-stone-500 font-mono">{item.weight} kg × {item.reps} 次 × {item.sets} 組 (容量: {item.weight * item.reps * item.sets}kg)</span>
+                  </div>
+                  <button onClick={() => setWorkoutsData(prev => ({ ...prev, [selectedDate]: prev[selectedDate].filter(i => i.id !== item.id) }))} className="text-stone-600 hover:text-stone-400 p-1 text-xs transition">✕</button>
+                </div>
+              ))}
+              {todayItems.length === 0 && <div className="text-center text-[11px] text-stone-600 py-6">此日尚未填寫訓練紀錄</div>}
+            </div>
+          </div>
+        );
+      };
 
-      <main className="px-4 py-6 safe-bottom">
-        {activeTab === "dashboard" && <Dashboard />}
-        {activeTab === "nutrition" && <NutritionInput />}
-        {activeTab === "workout" && <WorkoutInput />}
-        {activeTab === "settings" && <Settings />}
-      </main>
+      return (
+        <div className="max-w-md mx-auto min-h-screen flex flex-col">
+          <header className="sticky top-0 z-20 bg-[#0c0a09]/90 backdrop-blur-md px-3 py-2.5 border-b border-stone-900 flex justify-between items-center">
+            <h1 className="text-sm font-bold tracking-tight text-stone-200">Eq.<span className="text-stone-400 font-normal">Track</span></h1>
+            <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} className="bg-stone-900 border border-stone-800 rounded-lg px-2 py-1 text-[11px] text-stone-300 font-mono outline-none" />
+          </header>
 
-      <nav className="fixed bottom-0 left-0 right-0 z-20 bg-zinc-900/90 backdrop-blur-lg border-t border-zinc-800 pb-safe">
-        <div className="max-w-md mx-auto flex justify-around">
-          {[{ id: "dashboard", icon: "📊", label: "總覽" }, { id: "nutrition", icon: "🥩", label: "飲食" }, { id: "workout", icon: "🏋️", label: "訓練" }, { id: "settings", icon: "⚙️", label: "設定" }].map(tab => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex-1 flex flex-col items-center py-3 ${activeTab === tab.id ? 'text-emerald-400' : 'text-zinc-500 hover:text-zinc-300'}`}>
-              <span className="text-xl mb-1">{tab.icon}</span>
-              <span className="text-[10px] font-bold">{tab.label}</span>
-            </button>
-          ))}
+          <main className="flex-1 p-3 safe-bottom overflow-y-auto">
+            {activeTab === "dashboard" && <Dashboard />}
+            {activeTab === "nutrition" && <NutritionInput />}
+            {activeTab === "workout" && <WorkoutInput />}
+          </main>
+
+          <nav className="fixed bottom-0 left-0 right-0 z-30 bg-[#0c0a09]/95 backdrop-blur-lg border-t border-stone-900">
+            <div className="max-w-md mx-auto flex justify-around">
+              {[
+                { id: "dashboard", label: "總覽" },
+                { id: "nutrition", label: "飲食" },
+                { id: "workout", label: "訓練" }
+              ].map(tab => (
+                <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex-1 flex flex-col items-center py-3 transition ${activeTab === tab.id ? 'text-stone-100 font-bold border-t-2 border-stone-300' : 'text-stone-500 hover:text-stone-300'}`}>
+                  <span className="text-[11px] tracking-widest">{tab.label}</span>
+                </button>
+              ))}
+            </div>
+          </nav>
         </div>
-      </nav>
-    </div>
-  );
-}
+      );
+    }
 
-const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(<App />);
-</script>
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
 </body>
 </html>
