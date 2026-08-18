@@ -21,7 +21,7 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useEffect, useMemo } = React;
+    const { useState, useEffect, useMemo, useRef } = React;
 
     const STORAGE_KEYS = {
       weight: "eq_weight_history",
@@ -202,6 +202,7 @@
         const [searchTerm, setSearchTerm] = useState("");
         const [selectedFood, setSelectedFood] = useState(LOCAL_FOOD_DB["肉類"][0]);
         const [amount, setAmount] = useState(100);
+        const [isFocused, setIsFocused] = useState(false);
 
         const allFoods = useMemo(() => [...LOCAL_FOOD_DB["肉類"], ...LOCAL_FOOD_DB["蔬菜"]], []);
         const suggestions = useMemo(() => {
@@ -234,12 +235,23 @@
                   placeholder="搜尋食物 (如: 雞胸, 牛扒...)" 
                   value={searchTerm} 
                   onChange={e => setSearchTerm(e.target.value)}
+                  onFocus={() => setIsFocused(true)}
+                  onBlur={() => setTimeout(() => setIsFocused(false), 250)}
                   className="w-full calm-input p-2.5 rounded-lg text-xs text-stone-200"
                 />
-                {suggestions.length > 0 && (
+                {isFocused && suggestions.length > 0 && (
                   <div className="absolute left-0 right-0 z-20 bg-stone-900 border border-stone-800 rounded-lg max-h-36 overflow-y-auto shadow-2xl mt-1">
                     {suggestions.map(f => (
-                      <div key={f.name} onClick={() => { setSelectedFood(f); setSearchTerm(f.name); }} className="p-2.5 text-xs cursor-pointer hover:bg-stone-800 border-b border-stone-800/50 last:border-0 text-stone-300">
+                      <div 
+                        key={f.name} 
+                        onMouseDown={(e) => {
+                          e.preventDefault(); // 防止 input 失焦導致點擊失效
+                          setSelectedFood(f); 
+                          setSearchTerm(f.name);
+                          setIsFocused(false);
+                        }} 
+                        className="p-2.5 text-xs cursor-pointer hover:bg-stone-800 border-b border-stone-800/50 last:border-0 text-stone-300"
+                      >
                         {f.name} <span className="text-[10px] text-stone-500 ml-1">({f.unit})</span>
                       </div>
                     ))}
@@ -286,6 +298,36 @@
         const [reps, setReps] = useState(10);
         const [sets, setSets] = useState(3);
 
+        // 休息計時器狀態
+        const [timeLeft, setTimeLeft] = useState(0);
+        const [timerActive, setTimerActive] = useState(false);
+
+        useEffect(() => {
+          let interval = null;
+          if (timerActive && timeLeft > 0) {
+            interval = setInterval(() => {
+              setTimeLeft(t => t - 1);
+            }, 1000);
+          } else if (timeLeft === 0 && timerActive) {
+            setTimerActive(false);
+            // 觸發震動（若手機支援）
+            if ("vibrate" in navigator) {
+              try { navigator.vibrate([200, 100, 200, 100, 300]); } catch (e) {}
+            }
+          }
+          return () => clearInterval(interval);
+        }, [timerActive, timeLeft]);
+
+        const startTimer = (seconds) => {
+          setTimeLeft(seconds);
+          setTimerActive(true);
+        };
+
+        const stopTimer = () => {
+          setTimerActive(false);
+          setTimeLeft(0);
+        };
+
         useEffect(() => {
           const merged = [...DEFAULT_WORKOUT_DB[category], ...(customWorkouts[category] || [])];
           setExercise(merged[0] || "");
@@ -303,12 +345,39 @@
 
           const newItem = { id: Date.now(), category, name: finalName, weight: parseFloat(weight), reps: parseInt(reps), sets: parseInt(sets) };
           setWorkoutsData(prev => ({ ...prev, [selectedDate]: [...(prev[selectedDate] || []), newItem] }));
+          
+          // 紀錄完成後自動開始 90 秒休息計時器
+          startTimer(90);
         };
 
         const todayItems = workoutsData[selectedDate] || [];
 
         return (
           <div className="space-y-3 pb-4">
+            {/* 組間休息計時器面板 (無彈窗，行內顯示) */}
+            <div className={`calm-card rounded-xl p-3 flex items-center justify-between transition-colors ${timerActive ? 'border-stone-500/80 bg-stone-900/80' : ''}`}>
+              <div className="flex items-center space-x-2">
+                <span className="text-xs">⏱️</span>
+                <div>
+                  <span className="text-[10px] text-stone-400 block uppercase tracking-wider">組間休息</span>
+                  <span className="text-sm font-mono font-bold text-stone-200">
+                    {timerActive ? `${Math.floor(timeLeft / 60)}:${String(timeLeft % 60).padStart(2, '0')}` : (timeLeft === 0 && timeLeft !== "" ? "計時完畢 (震動提醒)" : "就緒")}
+                  </span>
+                </div>
+              </div>
+              <div className="flex gap-1.5">
+                {!timerActive ? (
+                  <>
+                    <button onClick={() => startTimer(60)} className="px-2.5 py-1 bg-stone-800 hover:bg-stone-700 rounded text-[11px] font-mono text-stone-300">60s</button>
+                    <button onClick={() => startTimer(90)} className="px-2.5 py-1 bg-stone-800 hover:bg-stone-700 rounded text-[11px] font-mono text-stone-300">90s</button>
+                    <button onClick={() => startTimer(120)} className="px-2.5 py-1 bg-stone-800 hover:bg-stone-700 rounded text-[11px] font-mono text-stone-300">120s</button>
+                  </>
+                ) : (
+                  <button onClick={stopTimer} className="px-3 py-1 bg-stone-700 hover:bg-stone-600 rounded text-[11px] text-stone-200 font-bold">停止</button>
+                )}
+              </div>
+            </div>
+
             <div className="calm-card rounded-xl p-3 space-y-2.5">
               <div className="grid grid-cols-2 gap-2">
                 <select value={category} onChange={e => setCategory(e.target.value)} className="calm-input p-2 rounded-lg text-xs">
@@ -345,7 +414,7 @@
                 </div>
               </div>
 
-              <button onClick={handleAdd} className="w-full bg-stone-200 text-stone-950 font-bold py-2.5 rounded-lg text-xs active:scale-95 transition hover:bg-white">記錄訓練</button>
+              <button onClick={handleAdd} className="w-full bg-stone-200 text-stone-950 font-bold py-2.5 rounded-lg text-xs active:scale-95 transition hover:bg-white">記錄訓練 (並開始 90s 休息)</button>
             </div>
 
             <div className="space-y-1.5">
