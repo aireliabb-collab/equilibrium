@@ -31,8 +31,7 @@ const STORAGE_KEYS = {
   nutrition: "eq_nutrition_data",
   nutritionTarget: "eq_nutrition_target",
   workouts: "eq_workouts_data",
-  customWorkouts: "eq_custom_workouts",
-  apiKey: "equilibrium_gemini_apiKey"
+  customWorkouts: "eq_custom_workouts"
 };
 
 const DEFAULT_WORKOUT_DB = {
@@ -91,7 +90,6 @@ function TrendChart({ data, xKey, yKey, color = "#10b981", formatY = (v) => v })
 function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [selectedDate, setSelectedDate] = useState(todayStr());
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem(STORAGE_KEYS.apiKey) || "");
 
   // 狀態管理
   const [weightHistory, setWeightHistory] = useState(() => loadJSON(STORAGE_KEYS.weight, {}));
@@ -106,7 +104,6 @@ function App() {
   useEffect(() => saveJSON(STORAGE_KEYS.nutrition, nutritionData), [nutritionData]);
   useEffect(() => saveJSON(STORAGE_KEYS.workouts, workoutsData), [workoutsData]);
   useEffect(() => saveJSON(STORAGE_KEYS.customWorkouts, customWorkouts), [customWorkouts]);
-  useEffect(() => localStorage.setItem(STORAGE_KEYS.apiKey, apiKey), [apiKey]);
 
   // --- 模組：體重輸入卡片 ---
   const WeightCard = () => {
@@ -245,44 +242,54 @@ function App() {
     );
   };
 
-  // --- 分頁 2：飲食輸入與 AI 分析 ---
+  // --- 分頁 2：飲食輸入與 Open Food Facts 搜尋 ---
   const NutritionInput = () => {
     const [name, setName] = useState("");
-    const [portion, setPortion] = useState("");
+    const [amount, setAmount] = useState("100"); // 預設份量數值
     const [p, setP] = useState(""); const [c, setC] = useState(""); const [f, setF] = useState("");
-    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [isSearching, setIsSearching] = useState(false);
 
-    const handleAIAnalyze = async () => {
-      if (!apiKey) return alert("請先到「設定」頁面輸入 Gemini API Key");
-      if (!name || !portion) return alert("請輸入「食物名稱」與「重量/份量」以進行分析");
+    const handleSearchOFF = async () => {
+      if (!name) return alert("請輸入食物名稱 (建議輸入英文，如: chicken breast)");
       
-      setIsAnalyzing(true);
+      setIsSearching(true);
       try {
-        const prompt = `請估算以下食物的營養素。食物：${name}，份量：${portion}。請只回傳純JSON格式，不要包含Markdown或其他文字。格式：{"p":蛋白質克數, "c":碳水克數, "f":脂肪克數}。數值請提供數字。`;
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-        });
+        const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(name)}&search_simple=1&action=process&json=1`;
+        const res = await fetch(url);
         const data = await res.json();
-        let text = data.candidates[0].content.parts[0].text;
-        text = text.replace(/```json/g, '').replace(/```/g, '').trim();
-        const parsed = JSON.parse(text);
-        
-        setP(parsed.p || 0); setC(parsed.c || 0); setF(parsed.f || 0);
+
+        if (data.products && data.products.length > 0) {
+          const product = data.products[0];
+          const nut = product.nutriments || {};
+          
+          // Open Food Facts 預設提供每 100g 的數值
+          const p100 = nut['proteins_100g'] || 0;
+          const c100 = nut['carbohydrates_100g'] || 0;
+          const f100 = nut['fat_100g'] || 0;
+
+          // 根據使用者輸入的重量進行比例換算 (預設基數為 100g)
+          const ratio = (parseFloat(amount) || 100) / 100;
+          setP(round1(p100 * ratio));
+          setC(round1(c100 * ratio));
+          setF(round1(f100 * ratio));
+        } else {
+          alert("在 Open Food Facts 找不到該食物，請嘗試輸入英文或自行手動填寫數值。");
+        }
       } catch (err) {
-        alert("AI 分析失敗，請檢查 API Key 或是重新嘗試。");
+        alert("連線至 Open Food Facts 失敗，請檢查網路。");
         console.error(err);
       } finally {
-        setIsAnalyzing(false);
+        setIsSearching(false);
       }
     };
 
     const handleAdd = () => {
       const pv = parseFloat(p)||0; const cv = parseFloat(c)||0; const fv = parseFloat(f)||0;
       if (pv===0 && cv===0 && fv===0) return;
-      const newItem = { id: Date.now(), name: `${name} (${portion})`.trim() || "未命名紀錄", p: pv, c: cv, f: fv, kcal: calcKcal(pv, cv, fv) };
+      const finalTitle = `${name} (${amount}g)`.trim();
+      const newItem = { id: Date.now(), name: finalTitle, p: pv, c: cv, f: fv, kcal: calcKcal(pv, cv, fv) };
       setNutritionData(prev => ({ ...prev, [selectedDate]: [...(prev[selectedDate]||[]), newItem] }));
-      setName(""); setPortion(""); setP(""); setC(""); setF("");
+      setName(""); setAmount("100"); setP(""); setC(""); setF("");
     };
 
     const todayItems = nutritionData[selectedDate] || [];
@@ -291,14 +298,14 @@ function App() {
       <div className="space-y-6">
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-3">
           <div className="flex justify-between items-center mb-1">
-            <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">AI 智能營養計算</h3>
+            <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">全球開放資料庫查詢 (Open Food Facts)</h3>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <input type="text" placeholder="食物名稱 (如: 雞胸肉)" value={name} onChange={e=>setName(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-sm outline-none focus:border-emerald-500" />
-            <input type="text" placeholder="重量/份量 (如: 100g, 1碗)" value={portion} onChange={e=>setPortion(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-sm outline-none focus:border-emerald-500" />
+            <input type="text" placeholder="食物名稱 (建議英文如: chicken breast)" value={name} onChange={e=>setName(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-sm outline-none focus:border-emerald-500" />
+            <input type="number" placeholder="重量 (g)" value={amount} onChange={e=>setAmount(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-sm outline-none focus:border-emerald-500" />
           </div>
-          <button onClick={handleAIAnalyze} disabled={isAnalyzing} className={`w-full font-bold px-4 py-2 rounded-xl text-sm transition ${isAnalyzing ? 'bg-zinc-700 text-zinc-500' : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/30'}`}>
-            {isAnalyzing ? "AI 分析中..." : "✨ 使用 AI 分析營養素"}
+          <button onClick={handleSearchOFF} disabled={isSearching} className={`w-full font-bold px-4 py-2 rounded-xl text-sm transition ${isSearching ? 'bg-zinc-700 text-zinc-500' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30'}`}>
+            {isSearching ? "查詢中..." : "🔍 從全球資料庫自動帶入營養素"}
           </button>
           
           <div className="grid grid-cols-3 gap-3 pt-2 border-t border-zinc-800 mt-2">
@@ -330,12 +337,10 @@ function App() {
     const categories = Object.keys(DEFAULT_WORKOUT_DB);
     const [category, setCategory] = useState(categories[0]);
     
-    // 合併預設與該分類的自訂動作
     const currentExercises = [...DEFAULT_WORKOUT_DB[category], ...(customWorkouts[category] || [])];
     const [exercise, setExercise] = useState(currentExercises[0]);
     const [newCustomName, setNewCustomName] = useState("");
 
-    // 下拉式狀態
     const [weight, setWeight] = useState(20);
     const [reps, setReps] = useState(10);
     const [sets, setSets] = useState(3);
@@ -347,7 +352,6 @@ function App() {
 
     const handleAdd = () => {
       let finalName = exercise;
-      // 如果選擇的是新增自訂動作，先將動作儲存進該分類
       if (exercise === "__custom__") {
         finalName = newCustomName.trim();
         if (!finalName) return alert("請輸入自訂動作名稱");
@@ -432,14 +436,8 @@ function App() {
   const Settings = () => (
     <div className="space-y-6">
       <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
-        <h2 className="text-sm font-bold text-zinc-200 mb-4">系統設定</h2>
-        <div className="space-y-3">
-          <div>
-            <label className="text-[10px] text-zinc-500 block mb-1">Gemini API Key (用於 AI 食物分析)</label>
-            <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="AIzaSy..." className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-emerald-500" />
-            <p className="text-[10px] text-zinc-600 mt-1">金鑰只會安全儲存在你的設備本機中。</p>
-          </div>
-        </div>
+        <h2 className="text-sm font-bold text-zinc-200 mb-2">系統設定</h2>
+        <p className="text-xs text-zinc-500">目前飲食搜尋已切換至 Open Food Facts 全球公開資料庫，無需設定任何 API Key。</p>
       </div>
     </div>
   );
