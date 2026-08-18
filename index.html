@@ -4,9 +4,10 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Equilibrium 追蹤系統</title>
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<!-- 補全 crossorigin 屬性防止 CDN 載入被封鎖 -->
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   body { font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
@@ -19,7 +20,7 @@
 <body class="bg-zinc-950 text-zinc-100 min-h-screen">
 <div id="root"></div>
 
-<script type="text/babel" data-presets="react">
+<script type="text/babel">
 const { useState, useEffect, useMemo, useCallback } = React;
 
 const STORAGE_KEYS = {
@@ -82,11 +83,13 @@ function getWeightForDate(weightHistory, dateStr) {
   return DEFAULT_WEIGHT;
 }
 
+// 增強型飲食文字解析器：支援 g, 克, 或純數字
 function parseNutritionText(text) {
   const items = [];
   FOOD_DB.forEach((food) => {
     const escaped = food.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const regex = new RegExp(escaped + "\\s*[:：]?\\s*(\\d+(?:\\.\\d+)?)\\s*g", "g");
+    // 匹配「雞胸肉 200g」、「雞胸肉200克」或「雞胸肉 200」
+    const regex = new RegExp(escaped + "\\s*[:：]?\\s*(\\d+(?:\\.\\d+)?)\\s*(?:g|克)?", "gi");
     let match;
     while ((match = regex.exec(text)) !== null) {
       const grams = parseFloat(match[1]);
