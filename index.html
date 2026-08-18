@@ -158,7 +158,6 @@
       useEffect(() => saveJSON(STORAGE_KEYS.customFoods, customFoods), [customFoods]);
       useEffect(() => saveJSON(STORAGE_KEYS.targetKcal, targetKcal), [targetKcal]);
 
-      // 估算全體動作的最高 1RM 摘要供總覽顯示
       const best1RM = useMemo(() => {
         let maxORM = 0;
         let bestEx = "";
@@ -166,7 +165,6 @@
           if (Array.isArray(dayItems)) {
             dayItems.forEach(item => {
               if (item.weight && item.reps) {
-                // Epley公式: 1RM = weight * (1 + reps / 30)
                 const orm = item.weight * (1 + item.reps / 30);
                 if (orm > maxORM) {
                   maxORM = orm;
@@ -263,7 +261,6 @@
               </div>
             </div>
 
-            {/* 力量表現 (One-Repetition Maximum 摘要卡) */}
             <div className="calm-card rounded-xl p-3 bg-white">
               <div className="flex justify-between items-center mb-1">
                 <span className="text-[10px] text-sky-600 uppercase tracking-wider font-bold">🏋️ 預估最高 1RM 表現</span>
@@ -319,7 +316,6 @@
         const [amount, setAmount] = useState(100);
         const [isFocused, setIsFocused] = useState(false);
 
-        // 自訂食物輸入狀態
         const [showCustomModal, setShowCustomModal] = useState(false);
         const [customName, setCustomName] = useState("");
         const [customP, setCustomP] = useState("");
@@ -383,8 +379,8 @@
                   onBlur={() => setTimeout(() => setIsFocused(false), 250)}
                   className="w-full calm-input p-2.5 rounded-lg text-xs text-slate-800"
                 />
-                {isFocused && (suggestions.length > 0 || true) && (
-                  <div className="absolute left-0 right-0 z-20 bg-white border border-sky-200 rounded-lg max-h-40 overflow-y-auto shadow-lg mt-1">
+                {isFocused && (
+                  <div className="absolute left-0 right-0 z-25 bg-white border border-sky-200 rounded-lg max-h-40 overflow-y-auto shadow-lg mt-1">
                     {suggestions.map(f => (
                       <div 
                         key={f.name} 
@@ -419,7 +415,6 @@
               </div>
             </div>
 
-            {/* 自訂食物彈出窗 */}
             {showCustomModal && (
               <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
                 <div className="bg-white rounded-xl p-4 max-w-sm w-full space-y-3 shadow-xl border border-sky-200">
@@ -499,8 +494,6 @@
 
           const newItem = { id: Date.now(), category, name: finalName, weight: parseFloat(weight), reps: parseInt(reps), sets: parseInt(sets) };
           setWorkoutsData(prev => ({ ...prev, [selectedDate]: [...(prev[selectedDate] || []), newItem] }));
-          
-          // 點擊後保留原選取項目與方格，不予重設
         };
 
         const todayItems = workoutsData[selectedDate] || [];
@@ -595,7 +588,7 @@
       );
     }
 
-    const root = ReactDOM.createRoot(getElementById("root") || document.getElementById("root"));
+    const root = ReactDOM.createRoot(document.getElementById("root"));
     root.render(<App />);
   </script>
 </body>
