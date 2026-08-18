@@ -9,25 +9,27 @@
   <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", sans-serif; -webkit-tap-highlight-color: transparent; background-color: #f4f4f5; color: #18181b; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", sans-serif; -webkit-tap-highlight-color: transparent; background-color: #f0f7ff; color: #1e293b; }
     ::-webkit-scrollbar { display: none; }
     .safe-bottom { padding-bottom: calc(75px + env(safe-area-inset-bottom)); }
-    .calm-card { background: #ffffff; border: 1px solid #e4e4e7; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05); }
-    .calm-input { background-color: #fafafa; border: 1px solid #d4d4d8; color: #18181b; }
-    .calm-input:focus { border-color: #71717a; outline: none; background-color: #ffffff; }
+    .calm-card { background: #ffffff; border: 1px solid #bae6fd; box-shadow: 0 1px 3px 0 rgba(14, 165, 233, 0.08); }
+    .calm-input { background-color: #f8fafc; border: 1px solid #cbd5e1; color: #1e293b; }
+    .calm-input:focus { border-color: #0284c7; outline: none; background-color: #ffffff; }
   </style>
 </head>
 <body class="min-h-screen">
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useEffect, useMemo, useRef } = React;
+    const { useState, useEffect, useMemo } = React;
 
     const STORAGE_KEYS = {
       weight: "eq_weight_history",
       nutrition: "eq_nutrition_data",
       workouts: "eq_workouts_data",
-      customWorkouts: "eq_custom_workouts"
+      customWorkouts: "eq_custom_workouts",
+      customFoods: "eq_custom_foods",
+      targetKcal: "eq_target_kcal"
     };
 
     const LOCAL_FOOD_DB = {
@@ -45,6 +47,28 @@
         { name: "瘦羊肉", p: 25, c: 0, f: 8, unit: "g" },
         { name: "雞柳", p: 22, c: 0, f: 1, unit: "g" },
         { name: "吞拿魚(罐)", p: 24, c: 0, f: 1, unit: "g" }
+      ],
+      "碳水化合物": [
+        { name: "白飯 (熟)", p: 2.7, c: 28, f: 0.3, unit: "g" },
+        { name: "糙米飯 (熟)", p: 2.6, c: 23, f: 0.9, unit: "g" },
+        { name: "紫米飯 (熟)", p: 3.0, c: 26, f: 1.0, unit: "g" },
+        { name: "意粉 (熟)", p: 5.0, c: 25, f: 1.1, unit: "g" },
+        { name: "蕎麥麵 (熟)", p: 5.1, c: 21, f: 0.5, unit: "g" },
+        { name: "烏冬 (熟)", p: 1.7, c: 20, f: 0.4, unit: "g" },
+        { name: "即食麵", p: 9.0, c: 60, f: 16, unit: "g" },
+        { name: "白方包", p: 8.0, c: 49, f: 3.2, unit: "片" },
+        { name: "全麥包", p: 9.0, c: 41, f: 3.5, unit: "片" },
+        { name: "燕麥片 (生)", p: 13.0, c: 66, f: 7.0, unit: "g" },
+        { name: "番薯 (蒸)", p: 1.6, c: 20, f: 0.1, unit: "g" },
+        { name: "紫薯 (蒸)", p: 1.5, c: 21, f: 0.2, unit: "g" },
+        { name: "馬鈴薯 (蒸)", p: 2.0, c: 17, f: 0.1, unit: "g" },
+        { name: "粟米 (熟)", p: 3.4, c: 25, f: 1.5, unit: "g" },
+        { name: "年糕", p: 5.0, c: 32, f: 0.2, unit: "g" },
+        { name: "通粉 (熟)", p: 4.8, c: 25, f: 0.9, unit: "g" },
+        { name: "河粉 (熟)", p: 1.5, c: 28, f: 0.5, unit: "g" },
+        { name: "米線 (熟)", p: 2.0, c: 25, f: 0.3, unit: "g" },
+        { name: "紅豆 (熟)", p: 8.7, c: 22, f: 0.5, unit: "g" },
+        { name: "粟米片", p: 7.0, c: 84, f: 1.0, unit: "g" }
       ],
       "蔬菜": [
         { name: "西蘭花", p: 3, c: 5, f: 0.3, unit: "g" },
@@ -82,9 +106,9 @@
     const repsOptions = Array.from({length: 50}, (_, i) => i + 1);
     const setsOptions = Array.from({length: 10}, (_, i) => i + 1);
 
-    function TrendChart({ data, yKey, color = "#52525b", formatY = (v) => v }) {
-      if (!data || data.length === 0) return <div className="h-28 flex items-center justify-center text-[11px] text-zinc-400 calm-card rounded-lg">尚無足夠軌跡紀錄</div>;
-      if (data.length === 1) return <div className="h-28 flex items-center justify-center text-[11px] text-zinc-500 calm-card rounded-lg">目前基準：{formatY(data[0][yKey])}</div>;
+    function TrendChart({ data, yKey, color = "#0284c7", formatY = (v) => v }) {
+      if (!data || data.length === 0) return <div className="h-28 flex items-center justify-center text-[11px] text-slate-400 calm-card rounded-lg">尚無足夠軌跡紀錄</div>;
+      if (data.length === 1) return <div className="h-28 flex items-center justify-center text-[11px] text-slate-500 calm-card rounded-lg">目前基準：{formatY(data[0][yKey])}</div>;
 
       const padding = { top: 12, bottom: 12, left: 8, right: 8 };
       const width = 400; const height = 110;
@@ -100,7 +124,7 @@
 
       return (
         <div className="relative w-full overflow-hidden calm-card rounded-lg pt-1">
-          <div className="absolute top-1 left-2 text-[9px] text-zinc-400 font-mono">高: {formatY(maxVal)} | 低: {formatY(minVal)}</div>
+          <div className="absolute top-1 left-2 text-[9px] text-slate-400 font-mono">高: {formatY(maxVal)} | 低: {formatY(minVal)}</div>
           <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-28">
             <polyline points={points} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             {data.map((d, i) => {
@@ -122,11 +146,38 @@
       const [nutritionData, setNutritionData] = useState(() => loadJSON(STORAGE_KEYS.nutrition, {}));
       const [workoutsData, setWorkoutsData] = useState(() => loadJSON(STORAGE_KEYS.workouts, {}));
       const [customWorkouts, setCustomWorkouts] = useState(() => loadJSON(STORAGE_KEYS.customWorkouts, { "推 (Push)": [], "拉 (Pull)": [], "腿 (Legs)": [], "核心": [] }));
+      const [customFoods, setCustomFoods] = useState(() => loadJSON(STORAGE_KEYS.customFoods, []));
+      const [targetKcal, setTargetKcal] = useState(() => loadJSON(STORAGE_KEYS.targetKcal, 2200));
+      const [editingTarget, setEditingTarget] = useState(false);
+      const [tempTarget, setTempTarget] = useState(targetKcal);
 
       useEffect(() => saveJSON(STORAGE_KEYS.weight, weightHistory), [weightHistory]);
       useEffect(() => saveJSON(STORAGE_KEYS.nutrition, nutritionData), [nutritionData]);
       useEffect(() => saveJSON(STORAGE_KEYS.workouts, workoutsData), [workoutsData]);
       useEffect(() => saveJSON(STORAGE_KEYS.customWorkouts, customWorkouts), [customWorkouts]);
+      useEffect(() => saveJSON(STORAGE_KEYS.customFoods, customFoods), [customFoods]);
+      useEffect(() => saveJSON(STORAGE_KEYS.targetKcal, targetKcal), [targetKcal]);
+
+      // 估算全體動作的最高 1RM 摘要供總覽顯示
+      const best1RM = useMemo(() => {
+        let maxORM = 0;
+        let bestEx = "";
+        Object.values(workoutsData).forEach(dayItems => {
+          if (Array.isArray(dayItems)) {
+            dayItems.forEach(item => {
+              if (item.weight && item.reps) {
+                // Epley公式: 1RM = weight * (1 + reps / 30)
+                const orm = item.weight * (1 + item.reps / 30);
+                if (orm > maxORM) {
+                  maxORM = orm;
+                  bestEx = `${item.name} (${item.weight}kg × ${item.reps}reps)`;
+                }
+              }
+            });
+          }
+        });
+        return { value: round1(maxORM), name: bestEx };
+      }, [workoutsData]);
 
       const Dashboard = () => {
         const [weightRange, setWeightRange] = useState(30);
@@ -160,22 +211,28 @@
         const sumC = todayNutri.reduce((acc, i) => acc + i.c, 0);
         const sumF = todayNutri.reduce((acc, i) => acc + i.f, 0);
         const sumKcal = calcKcal(sumP, sumC, sumF);
+        const kcalDiff = round1(sumKcal - targetKcal);
+
+        const saveTarget = () => {
+          setTargetKcal(Number(tempTarget));
+          setEditingTarget(false);
+        };
 
         return (
           <div className="space-y-3 pb-4">
             <div className="calm-card rounded-xl p-3 bg-white">
-              <p className="text-[11px] text-zinc-600 italic">“ {dailyQuote} ”</p>
+              <p className="text-[11px] text-slate-600 italic">“ {dailyQuote} ”</p>
             </div>
 
             <div className="calm-card rounded-xl p-3 flex items-center justify-between bg-white">
               <div>
-                <span className="text-[10px] text-zinc-500 uppercase tracking-wider block">今日體重基準</span>
-                <span className="text-2xl font-bold font-mono text-zinc-800">{todayWeight.toFixed(1)} <span className="text-xs text-zinc-500 font-sans">kg</span></span>
+                <span className="text-[10px] text-slate-500 uppercase tracking-wider block">今日體重基準</span>
+                <span className="text-2xl font-bold font-mono text-slate-800">{todayWeight.toFixed(1)} <span className="text-xs text-slate-500 font-sans">kg</span></span>
               </div>
               <div className="grid grid-cols-6 gap-1">
                 {[-1.0, -0.5, -0.1, +0.1, +0.5, +1.0].map(val => (
                   <button key={val} onClick={() => handleAdjust(val)}
-                    className={`px-2 py-1.5 rounded text-[11px] font-bold active:scale-95 border transition ${val > 0 ? 'bg-zinc-100 text-zinc-700 border-zinc-300 hover:bg-zinc-200' : 'bg-zinc-50 text-zinc-600 border-zinc-200 hover:bg-zinc-100'}`}>
+                    className={`px-2 py-1.5 rounded text-[11px] font-bold active:scale-95 border transition ${val > 0 ? 'bg-sky-50 text-sky-700 border-sky-200 hover:bg-sky-100' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}>
                     {val > 0 ? `+${val}` : val}
                   </button>
                 ))}
@@ -184,22 +241,46 @@
 
             <div className="calm-card rounded-xl p-3 bg-white">
               <div className="flex justify-between items-center mb-1.5">
-                <span className="text-[10px] text-zinc-500 uppercase tracking-wider">今日營養累積</span>
-                <span className="text-xs font-mono font-bold text-zinc-700">{round1(sumKcal)} <span className="text-[10px] text-zinc-400">kcal</span></span>
+                <div className="flex items-center space-x-2">
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider">今日營養與卡路里盈餘</span>
+                  {!editingTarget ? (
+                    <button onClick={() => { setTempTarget(targetKcal); setEditingTarget(true); }} className="text-[10px] text-sky-600 hover:underline">目標:{targetKcal}kcal (改)</button>
+                  ) : (
+                    <div className="flex items-center space-x-1">
+                      <input type="number" value={tempTarget} onChange={e => setTempTarget(e.target.value)} className="w-16 calm-input px-1 py-0.5 text-[10px] font-mono rounded" />
+                      <button onClick={saveTarget} className="bg-sky-600 text-white text-[10px] px-1.5 py-0.5 rounded">好</button>
+                    </div>
+                  )}
+                </div>
+                <span className={`text-xs font-mono font-bold ${kcalDiff >= 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                  {kcalDiff >= 0 ? `+${kcalDiff}` : kcalDiff} <span className="text-[10px] font-normal text-slate-400">kcal 盈餘</span>
+                </span>
               </div>
               <div className="grid grid-cols-3 gap-2 text-[11px]">
-                <div className="bg-zinc-50 p-2 rounded-lg border border-zinc-200"><span className="text-zinc-500 block text-[9px]">蛋白質 (P)</span><span className="font-mono font-bold text-zinc-700">{round1(sumP)}g</span></div>
-                <div className="bg-zinc-50 p-2 rounded-lg border border-zinc-200"><span className="text-zinc-500 block text-[9px]">碳水 (C)</span><span className="font-mono font-bold text-zinc-700">{round1(sumC)}g</span></div>
-                <div className="bg-zinc-50 p-2 rounded-lg border border-zinc-200"><span className="text-zinc-500 block text-[9px]">脂肪 (F)</span><span className="font-mono font-bold text-zinc-700">{round1(sumF)}g</span></div>
+                <div className="bg-slate-50 p-2 rounded-lg border border-slate-200"><span className="text-slate-500 block text-[9px]">蛋白質 (P)</span><span className="font-mono font-bold text-slate-700">{round1(sumP)}g</span></div>
+                <div className="bg-slate-50 p-2 rounded-lg border border-slate-200"><span className="text-slate-500 block text-[9px]">碳水 (C)</span><span className="font-mono font-bold text-slate-700">{round1(sumC)}g</span></div>
+                <div className="bg-slate-50 p-2 rounded-lg border border-slate-200"><span className="text-slate-500 block text-[9px]">脂肪 (F)</span><span className="font-mono font-bold text-slate-700">{round1(sumF)}g</span></div>
+              </div>
+            </div>
+
+            {/* 力量表現 (One-Repetition Maximum 摘要卡) */}
+            <div className="calm-card rounded-xl p-3 bg-white">
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-[10px] text-sky-600 uppercase tracking-wider font-bold">🏋️ 預估最高 1RM 表現</span>
+                <span className="text-[10px] text-slate-400 font-mono">Epley Formula</span>
+              </div>
+              <div className="flex justify-between items-baseline">
+                <span className="text-xl font-bold font-mono text-slate-800">{best1RM.value > 0 ? `${best1RM.value} kg` : "尚無數據"}</span>
+                <span className="text-[11px] text-slate-500">{best1RM.name}</span>
               </div>
             </div>
 
             <div className="calm-card rounded-xl p-3 bg-white">
               <div className="flex justify-between items-center mb-2">
-                <span className="text-[10px] text-zinc-500 uppercase tracking-wider">體重軌跡</span>
+                <span className="text-[10px] text-slate-500 uppercase tracking-wider">體重軌跡</span>
                 <div className="flex gap-1">
                   {[7, 30, 90].map(days => (
-                    <button key={days} onClick={() => setWeightRange(days)} className={`px-2 py-0.5 rounded text-[10px] font-medium border transition ${weightRange === days ? 'bg-zinc-200 text-zinc-800 border-zinc-300' : 'bg-transparent text-zinc-400 border-transparent'}`}>
+                    <button key={days} onClick={() => setWeightRange(days)} className={`px-2 py-0.5 rounded text-[10px] font-medium border transition ${weightRange === days ? 'bg-sky-100 text-sky-800 border-sky-300' : 'bg-transparent text-slate-400 border-transparent'}`}>
                       {days === 7 ? '近週' : days === 30 ? '近月' : '近季'}
                     </button>
                   ))}
@@ -210,16 +291,16 @@
 
             <div className="calm-card rounded-xl p-3 bg-white">
               <div className="flex justify-between items-center mb-2">
-                <span className="text-[10px] text-zinc-500 uppercase tracking-wider">健身總容量軌跡 (Volume)</span>
+                <span className="text-[10px] text-slate-500 uppercase tracking-wider">健身總容量軌跡 (Volume)</span>
                 <div className="flex gap-1">
                   {[7, 30, 90].map(days => (
-                    <button key={days} onClick={() => setWorkoutRange(days)} className={`px-2 py-0.5 rounded text-[10px] font-medium border transition ${workoutRange === days ? 'bg-zinc-200 text-zinc-800 border-zinc-300' : 'bg-transparent text-zinc-400 border-transparent'}`}>
+                    <button key={days} onClick={() => setWorkoutRange(days)} className={`px-2 py-0.5 rounded text-[10px] font-medium border transition ${workoutRange === days ? 'bg-sky-100 text-sky-800 border-sky-300' : 'bg-transparent text-slate-400 border-transparent'}`}>
                       {days === 7 ? '近週' : days === 30 ? '近月' : '近季'}
                     </button>
                   ))}
                 </div>
               </div>
-              <TrendChart data={workoutChartData} yKey="volume" color="#71717a" formatY={v => `${v}kg`} />
+              <TrendChart data={workoutChartData} yKey="volume" color="#0284c7" formatY={v => `${v}kg`} />
             </div>
           </div>
         );
@@ -227,17 +308,32 @@
 
       const NutritionInput = () => {
         const [searchTerm, setSearchTerm] = useState("");
-        const [selectedFood, setSelectedFood] = useState(LOCAL_FOOD_DB["肉類"][0]);
+        const allFoods = useMemo(() => [
+          ...LOCAL_FOOD_DB["肉類"], 
+          ...LOCAL_FOOD_DB["碳水化合物"], 
+          ...LOCAL_FOOD_DB["蔬菜"],
+          ...customFoods
+        ], [customFoods]);
+
+        const [selectedFood, setSelectedFood] = useState(allFoods[0]);
         const [amount, setAmount] = useState(100);
         const [isFocused, setIsFocused] = useState(false);
 
-        const allFoods = useMemo(() => [...LOCAL_FOOD_DB["肉類"], ...LOCAL_FOOD_DB["蔬菜"]], []);
+        // 自訂食物輸入狀態
+        const [showCustomModal, setShowCustomModal] = useState(false);
+        const [customName, setCustomName] = useState("");
+        const [customP, setCustomP] = useState("");
+        const [customC, setCustomC] = useState("");
+        const [customF, setCustomF] = useState("");
+        const [customUnit, setCustomUnit] = useState("g");
+
         const suggestions = useMemo(() => {
           if (!searchTerm) return [];
           return allFoods.filter(f => f.name.includes(searchTerm));
-        }, [searchTerm]);
+        }, [searchTerm, allFoods]);
 
         const handleAdd = () => {
+          if (!selectedFood) return;
           const ratio = selectedFood.unit === "g" ? amount / 100 : amount;
           const newItem = {
             id: Date.now(),
@@ -251,23 +347,44 @@
           setSearchTerm("");
         };
 
+        const handleSaveCustomFood = () => {
+          if (!customName.trim()) return;
+          const newFood = {
+            name: customName.trim(),
+            p: parseFloat(customP) || 0,
+            c: parseFloat(customC) || 0,
+            f: parseFloat(customF) || 0,
+            unit: customUnit
+          };
+          setCustomFoods(prev => [...prev, newFood]);
+          setSelectedFood(newFood);
+          setSearchTerm(newFood.name);
+          setShowCustomModal(false);
+          setCustomName(""); setCustomP(""); setCustomC(""); setCustomF("");
+        };
+
         const todayItems = nutritionData[selectedDate] || [];
 
         return (
           <div className="space-y-3 pb-4">
             <div className="calm-card rounded-xl p-3 space-y-2.5 relative bg-white">
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] text-slate-500 uppercase tracking-wider">飲食項目搜尋與加入</span>
+                <button onClick={() => setShowCustomModal(true)} className="text-[11px] text-sky-600 font-bold hover:underline">＋ 自訂營養素食物</button>
+              </div>
+
               <div className="relative">
                 <input 
                   type="text" 
-                  placeholder="搜尋食物 (如: 雞胸, 牛扒...)" 
+                  placeholder="搜尋食物 (如: 白飯, 雞胸, 蕎麥麵...)" 
                   value={searchTerm} 
                   onChange={e => setSearchTerm(e.target.value)}
                   onFocus={() => setIsFocused(true)}
                   onBlur={() => setTimeout(() => setIsFocused(false), 250)}
-                  className="w-full calm-input p-2.5 rounded-lg text-xs text-zinc-800"
+                  className="w-full calm-input p-2.5 rounded-lg text-xs text-slate-800"
                 />
-                {isFocused && suggestions.length > 0 && (
-                  <div className="absolute left-0 right-0 z-20 bg-white border border-zinc-200 rounded-lg max-h-36 overflow-y-auto shadow-lg mt-1">
+                {isFocused && (suggestions.length > 0 || true) && (
+                  <div className="absolute left-0 right-0 z-20 bg-white border border-sky-200 rounded-lg max-h-40 overflow-y-auto shadow-lg mt-1">
                     {suggestions.map(f => (
                       <div 
                         key={f.name} 
@@ -277,11 +394,15 @@
                           setSearchTerm(f.name);
                           setIsFocused(false);
                         }} 
-                        className="p-2.5 text-xs cursor-pointer hover:bg-zinc-100 border-b border-zinc-100 last:border-0 text-zinc-700"
+                        className="p-2.5 text-xs cursor-pointer hover:bg-sky-50 border-b border-sky-100 last:border-0 text-slate-700 flex justify-between"
                       >
-                        {f.name} <span className="text-[10px] text-zinc-400 ml-1">({f.unit})</span>
+                        <span>{f.name} <span className="text-[10px] text-slate-400 ml-1">({f.unit})</span></span>
+                        <span className="text-[10px] font-mono text-slate-500">P:{f.p} C:{f.c} F:{f.f}</span>
                       </div>
                     ))}
+                    {suggestions.length === 0 && (
+                      <div className="p-2.5 text-xs text-slate-400 text-center">找不到相符食物，可點上方「自訂營養素食物」新增</div>
+                    )}
                   </div>
                 )}
               </div>
@@ -291,24 +412,60 @@
                   type="number" 
                   value={amount} 
                   onChange={e => setAmount(Number(e.target.value))} 
-                  placeholder={selectedFood.unit === "g" ? "重量 (g)" : "數量 (隻)"} 
+                  placeholder={selectedFood?.unit === "g" ? "重量 (g)" : "數量"} 
                   className="w-2/3 calm-input p-2.5 rounded-lg text-xs font-mono" 
                 />
-                <button onClick={handleAdd} className="w-1/3 bg-zinc-800 text-white font-bold py-2.5 rounded-lg text-xs active:scale-95 transition hover:bg-zinc-700">加入紀錄</button>
+                <button onClick={handleAdd} className="w-1/3 bg-sky-600 text-white font-bold py-2.5 rounded-lg text-xs active:scale-95 transition hover:bg-sky-500">加入紀錄</button>
               </div>
             </div>
+
+            {/* 自訂食物彈出窗 */}
+            {showCustomModal && (
+              <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+                <div className="bg-white rounded-xl p-4 max-w-sm w-full space-y-3 shadow-xl border border-sky-200">
+                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">新增自訂食物 (每 100g 或每單位)</h3>
+                  <input type="text" placeholder="食物名稱 (例如: 秘製手工水餃)" value={customName} onChange={e=>setCustomName(e.target.value)} className="w-full calm-input p-2 rounded text-xs" />
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <span className="text-[9px] text-slate-400 block">蛋白質 P (g)</span>
+                      <input type="number" placeholder="0" value={customP} onChange={e=>setCustomP(e.target.value)} className="w-full calm-input p-2 rounded text-xs font-mono" />
+                    </div>
+                    <div>
+                      <span className="text-[9px] text-slate-400 block">碳水 C (g)</span>
+                      <input type="number" placeholder="0" value={customC} onChange={e=>setCustomC(e.target.value)} className="w-full calm-input p-2 rounded text-xs font-mono" />
+                    </div>
+                    <div>
+                      <span className="text-[9px] text-slate-400 block">脂肪 F (g)</span>
+                      <input type="number" placeholder="0" value={customF} onChange={e=>setCustomF(e.target.value)} className="w-full calm-input p-2 rounded text-xs font-mono" />
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-[11px] text-slate-600">計量單位:</span>
+                    <select value={customUnit} onChange={e=>setCustomUnit(e.target.value)} className="calm-input p-1.5 rounded text-xs">
+                      <option value="g">g (每100克)</option>
+                      <option value="件">件 / 個 / 隻 (每單件)</option>
+                      <option value="碗">碗 (每碗)</option>
+                    </select>
+                  </div>
+                  <div className="flex gap-2 pt-2">
+                    <button onClick={handleSaveCustomFood} className="flex-1 bg-sky-600 text-white font-bold py-2 rounded text-xs">儲存並選用</button>
+                    <button onClick={() => setShowCustomModal(false)} className="flex-1 bg-slate-200 text-slate-700 py-2 rounded text-xs">取消</button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-1.5">
               {todayItems.map(item => (
                 <div key={item.id} className="calm-card rounded-lg p-2.5 flex justify-between items-center text-xs bg-white">
                   <div>
-                    <span className="font-bold text-zinc-800 block">{item.name}</span>
-                    <span className="text-[10px] text-zinc-500 font-mono">P:{item.p}g | C:{item.c}g | F:{item.f}g ➔ {item.kcal} kcal</span>
+                    <span className="font-bold text-slate-800 block">{item.name}</span>
+                    <span className="text-[10px] text-slate-500 font-mono">P:{item.p}g | C:{item.c}g | F:{item.f}g ➔ {item.kcal} kcal</span>
                   </div>
-                  <button onClick={() => setNutritionData(p => ({ ...p, [selectedDate]: p[selectedDate].filter(i => i.id !== item.id) }))} className="text-zinc-400 hover:text-zinc-600 p-1 text-xs transition">✕</button>
+                  <button onClick={() => setNutritionData(p => ({ ...p, [selectedDate]: p[selectedDate].filter(i => i.id !== item.id) }))} className="text-slate-400 hover:text-slate-600 p-1 text-xs transition">✕</button>
                 </div>
               ))}
-              {todayItems.length === 0 && <div className="text-center text-[11px] text-zinc-400 py-6">此日尚未填寫飲食紀錄</div>}
+              {todayItems.length === 0 && <div className="text-center text-[11px] text-slate-400 py-6">此日尚未填寫飲食紀錄</div>}
             </div>
           </div>
         );
@@ -324,32 +481,6 @@
         const [weight, setWeight] = useState(20);
         const [reps, setReps] = useState(10);
         const [sets, setSets] = useState(3);
-
-        const [timeLeft, setTimeLeft] = useState(0);
-        const [timerActive, setTimerActive] = useState(false);
-
-        useEffect(() => {
-          let interval = null;
-          if (timerActive && timeLeft > 0) {
-            interval = setInterval(() => {
-              setTimeLeft(t => t - 1);
-            }, 1000);
-          } else if (timeLeft === 0 && timerActive) {
-            setTimerActive(false);
-            alert("⏱️ 休息時間到！請準備進行下一組訓練。");
-          }
-          return () => clearInterval(interval);
-        }, [timerActive, timeLeft]);
-
-        const startTimer = (seconds) => {
-          setTimeLeft(seconds);
-          setTimerActive(true);
-        };
-
-        const stopTimer = () => {
-          setTimerActive(false);
-          setTimeLeft(0);
-        };
 
         useEffect(() => {
           const merged = [...DEFAULT_WORKOUT_DB[category], ...(customWorkouts[category] || [])];
@@ -369,36 +500,13 @@
           const newItem = { id: Date.now(), category, name: finalName, weight: parseFloat(weight), reps: parseInt(reps), sets: parseInt(sets) };
           setWorkoutsData(prev => ({ ...prev, [selectedDate]: [...(prev[selectedDate] || []), newItem] }));
           
-          startTimer(90);
+          // 點擊後保留原選取項目與方格，不予重設
         };
 
         const todayItems = workoutsData[selectedDate] || [];
 
         return (
           <div className="space-y-3 pb-4">
-            <div className={`calm-card rounded-xl p-3 flex items-center justify-between bg-white transition-colors ${timerActive ? 'border-zinc-400 bg-zinc-50' : ''}`}>
-              <div className="flex items-center space-x-2">
-                <span className="text-xs">⏱️</span>
-                <div>
-                  <span className="text-[10px] text-zinc-500 block uppercase tracking-wider">組間休息</span>
-                  <span className="text-sm font-mono font-bold text-zinc-800">
-                    {timerActive ? `${Math.floor(timeLeft / 60)}:${String(timeLeft % 60).padStart(2, '0')}` : "就緒"}
-                  </span>
-                </div>
-              </div>
-              <div className="flex gap-1.5">
-                {!timerActive ? (
-                  <>
-                    <button onClick={() => startTimer(60)} className="px-2.5 py-1 bg-zinc-100 hover:bg-zinc-200 rounded text-[11px] font-mono text-zinc-700 border border-zinc-200">60s</button>
-                    <button onClick={() => startTimer(90)} className="px-2.5 py-1 bg-zinc-100 hover:bg-zinc-200 rounded text-[11px] font-mono text-zinc-700 border border-zinc-200">90s</button>
-                    <button onClick={() => startTimer(120)} className="px-2.5 py-1 bg-zinc-100 hover:bg-zinc-200 rounded text-[11px] font-mono text-zinc-700 border border-zinc-200">120s</button>
-                  </>
-                ) : (
-                  <button onClick={stopTimer} className="px-3 py-1 bg-zinc-200 hover:bg-zinc-300 rounded text-[11px] text-zinc-800 font-bold">停止</button>
-                )}
-              </div>
-            </div>
-
             <div className="calm-card rounded-xl p-3 space-y-2.5 bg-white">
               <div className="grid grid-cols-2 gap-2">
                 <select value={category} onChange={e => setCategory(e.target.value)} className="calm-input p-2 rounded-lg text-xs">
@@ -416,39 +524,42 @@
 
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <span className="text-[9px] text-zinc-500 block mb-0.5">重量(kg)</span>
+                  <span className="text-[9px] text-slate-500 block mb-0.5">重量(kg)</span>
                   <select value={weight} onChange={e=>setWeight(e.target.value)} className="w-full calm-input p-2 rounded-lg text-xs font-mono">
                     {weightOptions.map(w => <option key={w} value={w}>{w}</option>)}
                   </select>
                 </div>
                 <div>
-                  <span className="text-[9px] text-zinc-500 block mb-0.5">次數</span>
+                  <span className="text-[9px] text-slate-500 block mb-0.5">次數</span>
                   <select value={reps} onChange={e=>setReps(e.target.value)} className="w-full calm-input p-2 rounded-lg text-xs font-mono">
                     {repsOptions.map(r => <option key={r} value={r}>{r}</option>)}
                   </select>
                 </div>
                 <div>
-                  <span className="text-[9px] text-zinc-500 block mb-0.5">組數</span>
+                  <span className="text-[9px] text-slate-500 block mb-0.5">組數</span>
                   <select value={sets} onChange={e=>setSets(e.target.value)} className="w-full calm-input p-2 rounded-lg text-xs font-mono">
                     {setsOptions.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
               </div>
 
-              <button onClick={handleAdd} className="w-full bg-zinc-800 text-white font-bold py-2.5 rounded-lg text-xs active:scale-95 transition hover:bg-zinc-700">記錄訓練 (並開始 90s 休息)</button>
+              <button onClick={handleAdd} className="w-full bg-sky-600 text-white font-bold py-2.5 rounded-lg text-xs active:scale-95 transition hover:bg-sky-500">記錄訓練 (保留當前選擇)</button>
             </div>
 
             <div className="space-y-1.5">
-              {todayItems.map(item => (
-                <div key={item.id} className="calm-card rounded-lg p-2.5 flex justify-between items-center text-xs bg-white">
-                  <div>
-                    <span className="font-bold text-zinc-800 block">{item.name}</span>
-                    <span className="text-[10px] text-zinc-500 font-mono">{item.weight} kg × {item.reps} 次 × {item.sets} 組 (容量: {item.weight * item.reps * item.sets}kg)</span>
+              {todayItems.map(item => {
+                const orm = round1(item.weight * (1 + item.reps / 30));
+                return (
+                  <div key={item.id} className="calm-card rounded-lg p-2.5 flex justify-between items-center text-xs bg-white">
+                    <div>
+                      <span className="font-bold text-slate-800 block">{item.name}</span>
+                      <span className="text-[10px] text-slate-500 font-mono">{item.weight} kg × {item.reps} 次 × {item.sets} 組 (容量: {item.weight * item.reps * item.sets}kg | 預估1RM: {orm}kg)</span>
+                    </div>
+                    <button onClick={() => setWorkoutsData(prev => ({ ...prev, [selectedDate]: prev[selectedDate].filter(i => i.id !== item.id) }))} className="text-slate-400 hover:text-slate-600 p-1 text-xs transition">✕</button>
                   </div>
-                  <button onClick={() => setWorkoutsData(prev => ({ ...prev, [selectedDate]: prev[selectedDate].filter(i => i.id !== item.id) }))} className="text-zinc-400 hover:text-zinc-600 p-1 text-xs transition">✕</button>
-                </div>
-              ))}
-              {todayItems.length === 0 && <div className="text-center text-[11px] text-zinc-400 py-6">此日尚未填寫訓練紀錄</div>}
+                );
+              })}
+              {todayItems.length === 0 && <div className="text-center text-[11px] text-slate-400 py-6">此日尚未填寫訓練紀錄</div>}
             </div>
           </div>
         );
@@ -456,9 +567,9 @@
 
       return (
         <div className="max-w-md mx-auto min-h-screen flex flex-col">
-          <header className="sticky top-0 z-20 bg-white/90 backdrop-blur-md px-3 py-2.5 border-b border-zinc-200 flex justify-between items-center shadow-xs">
-            <h1 className="text-sm font-bold tracking-tight text-zinc-800">Eq.<span className="text-zinc-500 font-normal">Track</span></h1>
-            <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} className="bg-zinc-100 border border-zinc-300 rounded-lg px-2 py-1 text-[11px] text-zinc-700 font-mono outline-none" />
+          <header className="sticky top-0 z-20 bg-white/90 backdrop-blur-md px-3 py-2.5 border-b border-sky-100 flex justify-between items-center shadow-xs">
+            <h1 className="text-sm font-bold tracking-tight text-slate-800">Eq.<span className="text-sky-600 font-normal">Track</span></h1>
+            <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} className="bg-sky-50 border border-sky-200 rounded-lg px-2 py-1 text-[11px] text-slate-700 font-mono outline-none" />
           </header>
 
           <main className="flex-1 p-3 safe-bottom overflow-y-auto">
@@ -467,14 +578,14 @@
             {activeTab === "workout" && <WorkoutInput />}
           </main>
 
-          <nav className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-lg border-t border-zinc-200">
+          <nav className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-lg border-t border-sky-100">
             <div className="max-w-md mx-auto flex justify-around">
               {[
                 { id: "dashboard", label: "總覽" },
                 { id: "nutrition", label: "飲食" },
                 { id: "workout", label: "訓練" }
               ].map(tab => (
-                <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex-1 flex flex-col items-center py-3 transition ${activeTab === tab.id ? 'text-zinc-900 font-bold border-t-2 border-zinc-800' : 'text-zinc-400 hover:text-zinc-600'}`}>
+                <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex-1 flex flex-col items-center py-3 transition ${activeTab === tab.id ? 'text-sky-700 font-bold border-t-2 border-sky-600' : 'text-slate-400 hover:text-slate-600'}`}>
                   <span className="text-[11px] tracking-widest">{tab.label}</span>
                 </button>
               ))}
@@ -484,7 +595,7 @@
       );
     }
 
-    const root = ReactDOM.createRoot(document.getElementById("root"));
+    const root = ReactDOM.createRoot(getElementById("root") || document.getElementById("root"));
     root.render(<App />);
   </script>
 </body>
