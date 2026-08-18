@@ -163,22 +163,17 @@
         const [workoutCategory, setWorkoutCategory] = useState("推 (Push)");
         const [workoutRange, setWorkoutRange] = useState(30);
 
-        // 1RM - 5RM 狀態選擇
         const categories = Object.keys(DEFAULT_WORKOUT_DB);
         const [rmCategory, setRmCategory] = useState(categories[0]);
         const rmExercises = [...DEFAULT_WORKOUT_DB[rmCategory], ...(customWorkouts[rmCategory] || [])];
         const [rmExercise, setRmExercise] = useState(rmExercises[0] || "");
-        const [rmType, setRmType] = useState(1); // 1到5
+        const [rmType, setRmType] = useState(1);
 
         useEffect(() => {
           const merged = [...DEFAULT_WORKOUT_DB[rmCategory], ...(customWorkouts[rmCategory] || [])];
           setRmExercise(merged[0] || "");
-        }, [rmCategory]);
+        }, [rmCategory, customWorkouts]);
 
-        // 計算指定動作與 X-RM 的歷史最高表現 (公式: weight = targetRM / (1 + reps/30) 的反推，或直接用使用者記錄過的實際重量換算)
-        // 為了準確，利用使用者輸入的任何一組 (weight, reps)，推算其對應的 n-RM
-        // 根據 Epley 公式推導: Weight_1RM = Weight * (1 + reps / 30)
-        // Weight_nRM = Weight_1RM / (1 + (n - 1) / 30)
         const targetRMData = useMemo(() => {
           if (!rmExercise) return { value: 0, record: "" };
           let maxVal = 0;
@@ -281,7 +276,6 @@
               </div>
             </div>
 
-            {/* 力量表現 (多 RM 選擇器) */}
             <div className="calm-card rounded-2xl p-4 bg-white space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-xs text-sky-700 uppercase tracking-wider font-bold">🏋️ 力量表現查詢 (N-RM)</span>
@@ -346,6 +340,139 @@
                 </div>
               </div>
               <TrendChart data={workoutChartData} yKey="volume" color="#0284c7" formatY={v => `${v}kg`} />
+            </div>
+          </div>
+        );
+      };
+
+      const WorkoutCalendar = () => {
+        const [currentDate, setCurrentDate] = useState(new Date());
+
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth();
+
+        const firstDayOfMonth = new Date(year, month, 1).getDay();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+        const prevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
+        const nextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
+
+        // 產生月曆格子
+        const calendarCells = useMemo(() => {
+          const cells = [];
+          // 補齊前面空白
+          for (let i = 0; i < firstDayOfMonth; i++) {
+            cells.push(null);
+          }
+          // 當月日期
+          for (let d = 1; d <= daysInMonth; d++) {
+            const mStr = String(month + 1).padStart(2, "0");
+            const dStr = String(d).padStart(2, "0");
+            const dateKey = `${year}-${mStr}-${dStr}`;
+            
+            const dayWorkouts = workoutsData[dateKey] || [];
+            const hasTrained = dayWorkouts.length > 0;
+
+            // 統計當日訓練部位
+            const categoriesDone = [...new Set(dayWorkouts.map(w => w.category))];
+
+            cells.push({
+              day: d,
+              dateKey,
+              hasTrained,
+              categoriesDone,
+              itemCount: dayWorkouts.length
+            });
+          }
+          return cells;
+        }, [year, month, workoutsData, firstDayOfMonth, daysInMonth]);
+
+        return (
+          <div className="space-y-4 pb-4">
+            <div className="calm-card rounded-2xl p-4 bg-white space-y-4">
+              <div className="flex justify-between items-center">
+                <h2 className="text-sm font-bold text-slate-800 font-mono">{year} 年 {month + 1} 月訓練月曆</h2>
+                <div className="flex space-x-1">
+                  <button onClick={prevMonth} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs font-bold text-slate-700">◀</button>
+                  <button onClick={nextMonth} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs font-bold text-slate-700">▶</button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-bold text-slate-400 pb-1 border-b border-sky-100">
+                <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+              </div>
+
+              <div className="grid grid-cols-7 gap-1.5">
+                {calendarCells.map((cell, idx) => {
+                  if (!cell) return <div key={idx} className="aspect-square"></div>;
+
+                  const isSelected = selectedDate === cell.dateKey;
+
+                  return (
+                    <div 
+                      key={cell.dateKey}
+                      onClick={() => setSelectedDate(cell.dateKey)}
+                      className={`aspect-square rounded-xl p-1 flex flex-col justify-between cursor-pointer transition border relative ${
+                        isSelected 
+                          ? 'border-sky-600 bg-sky-50 shadow-sm ring-1 ring-sky-600' 
+                          : cell.hasTrained 
+                            ? 'border-sky-200 bg-white hover:border-sky-400' 
+                            : 'border-slate-100 bg-slate-50/60 text-slate-300'
+                      }`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <span className={`text-xs font-mono font-bold ${cell.hasTrained ? 'text-slate-800' : 'text-slate-400'}`}>{cell.day}</span>
+                        {cell.hasTrained && (
+                          <span className="w-2 h-2 rounded-full bg-sky-600 shadow-xs" title="有訓練"></span>
+                        )}
+                      </div>
+
+                      {/* 顯示有做 gym 的視覺標示：顯示訓練部位簡稱或圖示 */}
+                      {cell.hasTrained ? (
+                        <div className="text-[9px] font-bold text-sky-700 truncate leading-tight">
+                          {cell.categoriesDone.map(c => c.split(" ")[0]).join("·")}
+                        </div>
+                      ) : (
+                        <div className="text-[9px] text-slate-300 text-center pb-1">休息</div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-sky-100 text-[11px] text-slate-500">
+                <div className="flex items-center space-x-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-sky-600 inline-block"></span>
+                  <span>有訓練日</span>
+                </div>
+                <div className="flex items-center space-x-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-slate-200 inline-block"></span>
+                  <span>休息日 (無紀錄)</span>
+                </div>
+                <span className="text-sky-600 font-bold">點擊日期可切換至該日</span>
+              </div>
+            </div>
+
+            {/* 快速檢視選定日期的訓練紀錄 */}
+            <div className="calm-card rounded-2xl p-4 bg-white space-y-3">
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">{selectedDate} 訓練總覽</h3>
+              {(workoutsData[selectedDate] && workoutsData[selectedDate].length > 0) ? (
+                <div className="space-y-2">
+                  {workoutsData[selectedDate].map(item => {
+                    const orm = round1(item.weight * (1 + item.reps / 30));
+                    return (
+                      <div key={item.id} className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs flex justify-between items-center">
+                        <div>
+                          <span className="font-bold text-slate-800 block mb-0.5">{item.name} <span className="text-[10px] text-sky-700 font-normal">({item.category})</span></span>
+                          <span className="text-slate-500 font-mono">{item.weight} kg × {item.reps} 次 × {item.sets} 組 (1RM: {orm}kg)</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center text-xs text-slate-400 py-6">此日沒有記錄任何訓練（休息日）</div>
+              )}
             </div>
           </div>
         );
@@ -528,7 +655,7 @@
         useEffect(() => {
           const merged = [...DEFAULT_WORKOUT_DB[category], ...(customWorkouts[category] || [])];
           setExercise(merged[0] || "");
-        }, [category]);
+        }, [category, customWorkouts]);
 
         const handleAdd = () => {
           let finalName = exercise;
@@ -542,7 +669,16 @@
 
           const newItem = { id: Date.now(), category, name: finalName, weight: parseFloat(weight), reps: parseInt(reps), sets: parseInt(sets) };
           setWorkoutsData(prev => ({ ...prev, [selectedDate]: [...(prev[selectedDate] || []), newItem] }));
-          // 完全不重設重量、次數與組數，保留當前選擇以利連續記錄
+        };
+
+        const handleDeleteCustom = (exName, e) => {
+          e.stopPropagation();
+          if (confirm(`確定要刪除自訂動作「${exName}」嗎？`)) {
+            setCustomWorkouts(prev => ({
+              ...prev,
+              [category]: prev[category].filter(item => item !== exName)
+            }));
+          }
         };
 
         const todayItems = workoutsData[selectedDate] || [];
@@ -554,10 +690,22 @@
                 <select value={category} onChange={e => setCategory(e.target.value)} className="calm-input p-3 rounded-xl text-xs font-bold text-slate-700">
                   {categories.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
-                <select value={exercise} onChange={e => setExercise(e.target.value)} className="calm-input p-3 rounded-xl text-xs font-bold text-slate-700">
-                  {currentExercises.map(ex => <option key={ex} value={ex}>{ex}</option>)}
-                  <option value="__custom__">➕ 自訂動作...</option>
-                </select>
+                <div className="relative flex items-center">
+                  <select value={exercise} onChange={e => setExercise(e.target.value)} className="w-full calm-input p-3 rounded-xl text-xs font-bold text-slate-700 pr-8">
+                    {DEFAULT_WORKOUT_DB[category].map(ex => <option key={ex} value={ex}>{ex}</option>)}
+                    {(customWorkouts[category] || []).map(ex => <option key={ex} value={ex}>✨ {ex}</option>)}
+                    <option value="__custom__">➕ 自訂動作...</option>
+                  </select>
+                  {customWorkouts[category]?.includes(exercise) && (
+                    <button 
+                      onClick={(e) => handleDeleteCustom(exercise, e)} 
+                      title="刪除此自訂動作" 
+                      className="absolute right-2 text-slate-400 hover:text-red-500 px-1.5 py-1 text-xs font-bold"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
               </div>
 
               {exercise === "__custom__" && (
@@ -616,16 +764,18 @@
 
           <main className="flex-1 p-4 safe-bottom overflow-y-auto">
             {activeTab === "dashboard" && <Dashboard />}
-            {activeTab === "nutrition" && <NutritionInput />}
+            {activeTab === "calendar" && <WorkoutCalendar />}
             {activeTab === "workout" && <WorkoutInput />}
+            {activeTab === "nutrition" && <NutritionInput />}
           </main>
 
           <nav className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-lg border-t border-sky-100 shadow-lg">
             <div className="max-w-md mx-auto flex justify-around">
               {[
                 { id: "dashboard", label: "總覽" },
-                { id: "nutrition", label: "飲食" },
-                { id: "workout", label: "訓練" }
+                { id: "calendar", label: "月曆" },
+                { id: "workout", label: "訓練" },
+                { id: "nutrition", label: "飲食" }
               ].map(tab => (
                 <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex-1 flex flex-col items-center py-3.5 transition ${activeTab === tab.id ? 'text-sky-700 font-bold border-t-2 border-sky-600 bg-sky-50/50' : 'text-slate-400 hover:text-slate-600'}`}>
                   <span className="text-xs tracking-wider font-bold">{tab.label}</span>
