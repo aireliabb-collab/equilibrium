@@ -11,11 +11,9 @@
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://unpkg.com/lucide@latest"></script>
 
   <style>
     body { background-color: #09090b; color: #f4f4f5; }
-    /* Hide scrollbar for clean UI */
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   </style>
@@ -27,67 +25,24 @@
   <script type="text/babel">
     const { useState, useEffect, useMemo, useRef } = React;
 
-    // ==========================================
-    // 1. Preset Food Catalogue & Tags
-    // ==========================================
-    const DEFAULT_FOOD_CATALOGUE = [
-      { id: 'f1', name: '雞胸肉 (生/熟平均)', calories: 120, protein: 23, carbs: 0, fat: 2.5 },
-      { id: 'f2', name: '白飯 (熟)', calories: 130, protein: 2.5, carbs: 28, fat: 0.3 },
-      { id: 'f3', name: '全蛋 (中型)', calories: 143, protein: 12.5, carbs: 0.7, fat: 9.5 },
-      { id: 'f4', name: '鮭魚 / 三文魚 (生)', calories: 208, protein: 20, carbs: 0, fat: 13 },
-      { id: 'f5', name: '地瓜 / 蕃薯 (蒸)', calories: 86, protein: 1.6, carbs: 20, fat: 0.1 },
-      { id: 'f6', name: '燕麥片 (乾)', calories: 389, protein: 16.9, carbs: 66, fat: 6.9 },
-      { id: 'f7', name: '瘦牛肉 (牛柳/板腱)', calories: 150, protein: 22, carbs: 0, fat: 6.5 }
-    ];
+    // 訓練部位與動作選單資料庫
+    const WORKOUT_EXERCISES = {
+      '胸部 (Chest)': ['槓鈴臥推', '上斜啞鈴推舉', '雙槓體撐', '繩索飛鳥', '夾胸機'],
+      '背部 (Back)': ['硬舉', '滑輪下拉', '槓鈴划船', '單臂啞鈴划船', '坐姿繩索划船'],
+      '肩部 (Shoulders)': ['站姿槓鈴肩推', '啞鈴側平舉', '繩索面拉', '後三角飛鳥'],
+      '腿部 (Legs)': ['深蹲', '羅馬尼亞硬舉 (RDL)', 'Leg Press 腿推', '腿彎舉', '腿伸展'],
+      '手臂 (Arms)': ['槓鈴彎舉', '三頭肌繩索壓下', '啞鈴錘式彎舉', '仰臥三頭伸展'],
+      '核心 (Core)': ['懸垂舉腿', '輪胎/滾輪滾輪', '負重板撐']
+    };
 
     const TAG_CATALOGUE = [
       { id: 'DOMS_INFLAMMATION', label: '大重量發炎 (DOMS)', badge: 'bg-rose-950/80 text-rose-300 border-rose-800' },
       { id: 'HIGH_SODIUM_MEAL', label: '高鈉外食/火鍋', badge: 'bg-amber-950/80 text-amber-300 border-amber-800' },
       { id: 'REFEED', label: '週期性補碳日', badge: 'bg-sky-950/80 text-sky-300 border-sky-800' },
       { id: 'LACK_OF_SLEEP', label: '睡眠不足 (<6h)', badge: 'bg-purple-950/80 text-purple-300 border-purple-800' },
-      { id: 'HIGH_STRESS', label: '高皮質醇/壓力', badge: 'bg-indigo-950/80 text-indigo-300 border-indigo-800' },
-      { id: 'DIGESTIVE_DELAY', label: '腸道排空延遲', badge: 'bg-zinc-800 text-zinc-300 border-zinc-700' }
+      { id: 'HIGH_STRESS', label: '高皮質醇/壓力', badge: 'bg-indigo-950/80 text-indigo-300 border-indigo-800' }
     ];
 
-    // Mock Sample Data (~90 days to test timeframes)
-    function generateMockData() {
-      const records = [];
-      const today = new Date('2026-08-18');
-      let baseWeight = 78.5;
-
-      for (let i = 90; i >= 0; i--) {
-        const d = new Date(today);
-        d.setDate(d.getDate() - i);
-        const dateStr = d.toISOString().split('T')[0];
-        
-        // Downward weight trend with noise
-        baseWeight -= 0.04 + (Math.random() * 0.02 - 0.01);
-        let noise = (Math.random() - 0.5) * 0.4;
-        let tags = [];
-
-        if (i % 7 === 0) { noise += 0.9; tags.push('HIGH_SODIUM_MEAL'); }
-        if (i % 5 === 0) { noise += 0.7; tags.push('DOMS_INFLAMMATION'); }
-
-        const rawWeight = Number((baseWeight + noise).toFixed(2));
-        const calories = Math.floor(2100 + (Math.random() * 200 - 100));
-        const protein = Math.floor(160 + (Math.random() * 20 - 10));
-        const volume = Math.floor(8000 + (Math.random() * 4000));
-
-        records.push({
-          date: dateStr,
-          weightKg: rawWeight,
-          tags: tags,
-          calories: calories,
-          protein: protein,
-          volume: volume
-        });
-      }
-      return records;
-    }
-
-    // ==========================================
-    // 2. Calculations & Helpers
-    // ==========================================
     function calculateRollingAverages(records, days) {
       const sorted = [...records].sort((a, b) => new Date(a.date) - new Date(b.date));
       return sorted.map((current, idx) => {
@@ -98,66 +53,33 @@
       });
     }
 
-    // Filter by Timeframe (7D, 30D, 90D, 180D, 365D, ALL)
-    function filterByTimeframe(records, timeframe) {
-      if (!records || records.length === 0) return [];
-      const sorted = [...records].sort((a, b) => new Date(a.date) - new Date(b.date));
-      if (timeframe === 'ALL') return sorted;
-      
-      const daysMap = { '7D': 7, '30D': 30, '90D': 90, '180D': 180, '365D': 365 };
-      const limitDays = daysMap[timeframe] || 30;
-      return sorted.slice(-limitDays);
-    }
-
-    // ==========================================
-    // 3. Components
-    // ==========================================
-
-    // Chart Component
-    function AnalyticsChart({ data, timeframe }) {
+    function AnalyticsChart({ data }) {
       const canvasRef = useRef(null);
       const chartRef = useRef(null);
 
       useEffect(() => {
         if (!canvasRef.current || data.length === 0) return;
         const ctx = canvasRef.current.getContext('2d');
-
         const avg7Map = new Map(calculateRollingAverages(data, 7).map(d => [d.date, d.avg]));
-        const avg30Map = new Map(calculateRollingAverages(data, 30).map(d => [d.date, d.avg]));
-
-        const labels = data.map(d => d.date.slice(5));
-        const rawWeights = data.map(d => d.weightKg);
-        const smooth7 = data.map(d => avg7Map.get(d.date));
-        const smooth30 = data.map(d => avg30Map.get(d.date));
 
         if (chartRef.current) chartRef.current.destroy();
 
         chartRef.current = new Chart(ctx, {
           type: 'line',
           data: {
-            labels: labels,
+            labels: data.map(d => d.date.slice(5)),
             datasets: [
               {
-                label: '7日真實走向 (滾動均線)',
-                data: smooth7,
+                label: '7日真實趨勢',
+                data: data.map(d => avg7Map.get(d.date)),
                 borderColor: '#10b981',
-                backgroundColor: '#10b981',
                 borderWidth: 2.5,
-                tension: 0.25,
+                tension: 0.2,
                 pointRadius: 0
               },
               {
-                label: '30日巨觀軌道',
-                data: smooth30,
-                borderColor: '#38bdf8',
-                borderWidth: 1.5,
-                borderDash: [4, 4],
-                tension: 0.25,
-                pointRadius: 0
-              },
-              {
-                label: '單日裸測 (水分噪點)',
-                data: rawWeights,
+                label: '單日裸測點',
+                data: data.map(d => d.weightKg),
                 borderColor: 'rgba(113, 113, 122, 0.3)',
                 backgroundColor: '#71717a',
                 showLine: false,
@@ -168,79 +90,64 @@
           options: {
             responsive: true,
             maintainAspectRatio: false,
-            interaction: { mode: 'index', intersect: false },
             scales: {
               x: { grid: { color: '#27272a' }, ticks: { color: '#a1a1aa', font: { size: 10 } } },
               y: { grid: { color: '#27272a' }, ticks: { color: '#a1a1aa', font: { size: 10 } } }
             },
-            plugins: {
-              legend: { labels: { color: '#d4d4d8', font: { size: 10 } } }
-            }
+            plugins: { legend: { labels: { color: '#d4d4d8', font: { size: 10 } } } }
           }
         });
 
         return () => { if (chartRef.current) chartRef.current.destroy(); };
-      }, [data, timeframe]);
+      }, [data]);
 
       return (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3 shadow-xl space-y-2">
-          <div className="h-60 w-full">
-            <canvas ref={canvasRef}></canvas>
-          </div>
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3 h-60 w-full">
+          <canvas ref={canvasRef}></canvas>
         </div>
       );
     }
 
-    // Main App Component
     function App() {
-      const [activeTab, setActiveTab] = useState('ANALYTICS'); // ANALYTICS, DIET, WORKOUT, DIAGNOSIS
-      const [timeframe, setTimeframe] = useState('30D');
-      const [selectedDate, setSelectedDate] = useState('2026-08-18');
+      const [activeTab, setActiveTab] = useState('ANALYTICS');
+      const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
       
-      // Data State
       const [records, setRecords] = useState(() => {
-        const saved = localStorage.getItem('eq_records_v3');
-        return saved ? JSON.parse(saved) : generateMockData();
+        const saved = localStorage.getItem('eq_records_v4');
+        return saved ? JSON.parse(saved) : [];
       });
 
-      const [foodCatalogue, setFoodCatalogue] = useState(() => {
-        const saved = localStorage.getItem('eq_food_cat_v3');
-        return saved ? JSON.parse(saved) : DEFAULT_FOOD_CATALOGUE;
+      // 目標設定 (Calories, Protein, Carbs, Fat)
+      const [targets, setTargets] = useState(() => {
+        const saved = localStorage.getItem('eq_targets_v1');
+        return saved ? JSON.parse(saved) : { calories: 2200, protein: 160, carbs: 220, fat: 60 };
       });
 
-      // Daily Logs State
+      const [showTargetModal, setShowTargetModal] = useState(false);
+
       const [dailyLog, setDailyLog] = useState({ weight: '', tags: [], foods: [], workouts: [] });
 
-      // Temporary Form Inputs
-      const [selectedFoodId, setSelectedFoodId] = useState('');
-      const [foodGrams, setFoodGrams] = useState('');
-      const [exerciseName, setExerciseName] = useState('');
+      // AI 食材分析 Input
+      const [aiFoodInput, setAiFoodInput] = useState('');
+      const [aiFoodLoading, setAiFoodLoading] = useState(false);
+
+      // 訓練選單 State
+      const [selectedCategory, setSelectedCategory] = useState(Object.keys(WORKOUT_EXERCISES)[0]);
+      const [selectedExercise, setSelectedExercise] = useState(WORKOUT_EXERCISES[Object.keys(WORKOUT_EXERCISES)[0]][0]);
       const [exWeight, setExWeight] = useState('');
       const [exReps, setExReps] = useState('');
       const [exSets, setExSets] = useState('');
 
-      // Custom Food Input Form
-      const [showCustomFood, setShowCustomFood] = useState(false);
-      const [customFood, setCustomFood] = useState({ name: '', calories: '', protein: '', carbs: '', fat: '' });
-
-      // AI Key State
       const [apiKey, setApiKey] = useState(localStorage.getItem('eq_gemini_key') || '');
-      const [aiDiagnosis, setAiDiagnosis] = useState(null);
-      const [aiLoading, setAiLoading] = useState(false);
 
       useEffect(() => {
-        localStorage.setItem('eq_records_v3', JSON.stringify(records));
+        localStorage.setItem('eq_records_v4', JSON.stringify(records));
       }, [records]);
 
       useEffect(() => {
-        localStorage.setItem('eq_food_cat_v3', JSON.stringify(foodCatalogue));
-      }, [foodCatalogue]);
+        localStorage.setItem('eq_targets_v1', JSON.stringify(targets));
+      }, [targets]);
 
-      useEffect(() => {
-        if (window.lucide) window.lucide.createIcons();
-      });
-
-      // Sync Daily Log when date changes
       useEffect(() => {
         const existing = records.find(r => r.date === selectedDate);
         if (existing) {
@@ -255,7 +162,6 @@
         }
       }, [selectedDate, records]);
 
-      // Save Data Helper
       const updateCurrentDateRecord = (fields) => {
         const updatedLog = { ...dailyLog, ...fields };
         setDailyLog(updatedLog);
@@ -287,128 +193,37 @@
         });
       };
 
-      // Handle Reset / Clear Data
-      const handleToggleDataMode = (mode) => {
-        if (mode === 'CLEAR') {
-          if (confirm('確定要清空所有紀錄，恢復空白個人狀態？')) {
-            setRecords([]);
-            localStorage.removeItem('eq_records_v3');
-          }
-        } else if (mode === 'RESET_MOCK') {
-          if (confirm('確定要重新載入測試數據？')) {
-            const mock = generateMockData();
-            setRecords(mock);
-          }
-        }
-      };
+      // 計算當日攝取總和
+      const consumedTotals = useMemo(() => {
+        return dailyLog.foods.reduce((acc, f) => ({
+          calories: acc.calories + (f.calories || 0),
+          protein: acc.protein + (f.protein || 0),
+          carbs: acc.carbs + (f.carbs || 0),
+          fat: acc.fat + (f.fat || 0)
+        }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+      }, [dailyLog.foods]);
 
-      // Filtered Records for Selected Timeframe
-      const timeframeRecords = useMemo(() => filterByTimeframe(records, timeframe), [records, timeframe]);
-
-      // Stats Summary
-      const statsSummary = useMemo(() => {
-        if (timeframeRecords.length < 2) return { deltaWeight: 0, avgCals: 0, avgProtein: 0, avgVol: 0 };
-        const sorted = [...timeframeRecords].sort((a, b) => new Date(a.date) - new Date(b.date));
-        
-        const validWeights = sorted.filter(r => r.weightKg);
-        const deltaWeight = validWeights.length >= 2 
-          ? Number((validWeights[validWeights.length - 1].weightKg - validWeights[0].weightKg).toFixed(2)) 
-          : 0;
-
-        const avgCals = Math.round(sorted.reduce((s, r) => s + (r.calories || 0), 0) / sorted.length);
-        const avgProtein = Math.round(sorted.reduce((s, r) => s + (r.protein || 0), 0) / sorted.length);
-        const avgVol = Math.round(sorted.reduce((s, r) => s + (r.volume || 0), 0) / sorted.length);
-
-        return { deltaWeight, avgCals, avgProtein, avgVol };
-      }, [timeframeRecords]);
-
-      // Food Handlers
-      const handleAddFood = () => {
-        if (!selectedFoodId || !foodGrams) return;
-        const foodItem = foodCatalogue.find(f => f.id === selectedFoodId);
-        if (!foodItem) return;
-
-        const grams = parseFloat(foodGrams);
-        const ratio = grams / 100;
-
-        const newFoodEntry = {
-          id: 'fe_' + Date.now(),
-          name: foodItem.name,
-          grams: grams,
-          calories: Math.round(foodItem.calories * ratio),
-          protein: Number((foodItem.protein * ratio).toFixed(1)),
-          carbs: Number((foodItem.carbs * ratio).toFixed(1)),
-          fat: Number((foodItem.fat * ratio).toFixed(1))
-        };
-
-        const newFoods = [...dailyLog.foods, newFoodEntry];
-        updateCurrentDateRecord({ foods: newFoods });
-        setFoodGrams('');
-      };
-
-      const handleAddCustomFood = () => {
-        if (!customFood.name || !customFood.calories) return;
-        const newItem = {
-          id: 'cf_' + Date.now(),
-          name: customFood.name,
-          calories: parseFloat(customFood.calories) || 0,
-          protein: parseFloat(customFood.protein) || 0,
-          carbs: parseFloat(customFood.carbs) || 0,
-          fat: parseFloat(customFood.fat) || 0
-        };
-        setFoodCatalogue([...foodCatalogue, newItem]);
-        setCustomFood({ name: '', calories: '', protein: '', carbs: '', fat: '' });
-        setShowCustomFood(false);
-      };
-
-      // Workout Handlers
-      const handleAddWorkout = () => {
-        if (!exerciseName || !exWeight || !exReps || !exSets) return;
-        const newWorkout = {
-          id: 'we_' + Date.now(),
-          name: exerciseName,
-          weight: parseFloat(exWeight),
-          reps: parseInt(exReps),
-          sets: parseInt(exSets)
-        };
-        const newWorkouts = [...dailyLog.workouts, newWorkout];
-        updateCurrentDateRecord({ workouts: newWorkouts });
-
-        // Auto-tag DOMS if volume is high
-        const vol = newWorkout.weight * newWorkout.reps * newWorkout.sets;
-        if (vol >= 3000 && !dailyLog.tags.includes('DOMS_INFLAMMATION')) {
-          updateCurrentDateRecord({ workouts: newWorkouts, tags: [...dailyLog.tags, 'DOMS_INFLAMMATION'] });
-        }
-
-        setExerciseName(''); setExWeight(''); setExReps(''); setExSets('');
-      };
-
-      // AI Diagnosis Trigger
-      const handleGenerateAI = async () => {
-        setAiLoading(true);
-        const sorted = [...records].sort((a, b) => new Date(a.date) - new Date(b.date));
-        const latest = sorted[sorted.length - 1] || {};
-        const avg7 = calculateRollingAverages(sorted, 7).pop()?.avg || latest.weightKg;
-        const delta = Number(((latest.weightKg || avg7) - avg7).toFixed(2));
+      // AI 分析食物與卡路里
+      const handleAnalyzeFoodAI = async () => {
+        if (!aiFoodInput.trim()) return;
+        setAiFoodLoading(true);
 
         const prompt = `
-你是一個去情緒化、嚴肅、客觀的運動生理學診斷系統。
-當前日期: ${selectedDate}
-最新裸測體重: ${latest.weightKg || '無'} kg，7日滾動均值: ${avg7} kg (Delta 偏差: ${delta} kg)
-當日標籤: ${latest.tags?.join(', ') || '無'}
-當日攝取熱量: ${latest.calories || 0} kcal, 蛋白質: ${latest.protein || 0} g
-當日訓練容量 Volume: ${latest.volume || 0} kg
+請分析以下食物描述並估算營養數據：
+「${aiFoodInput}」
 
-請輸出 JSON 格式 (不要 Markdown，直接 JSON)：
+請直接輸出 JSON 格式 (不要包含 markdown 標籤或其餘文字)：
 {
-  "trendFact": "說明滾動均線與當前趨勢事實。",
-  "decoupleAnalysis": "針對當日熱量、高鈉/補碳標籤與訓練容量，進行水分與發炎解耦分析。",
-  "actionDirective": "給出 1-2 句冷酷、直接的行為校準指令。"
+  "name": "簡短摘要內容描述",
+  "calories": 數字(kcal),
+  "protein": 數字(g),
+  "carbs": 數字(g),
+  "fat": 數字(g)
 }
 `;
 
-        if (apiKey) {
-          try {
+        try {
+          if (apiKey) {
             const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -417,23 +232,40 @@
             const data = await res.json();
             const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
             const clean = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-            setAiDiagnosis(JSON.parse(clean));
-          } catch (e) {
-            setAiDiagnosis({
-              trendFact: `7日滾動均線 (${avg7} kg) 為唯一事實。`,
-              decoupleAnalysis: `當日前後 Delta 偏差 ${delta} kg 屬水分與肌肉發炎正常波動，非體脂驟增。`,
-              actionDirective: `保持熱量赤字與計畫執行，嚴禁衝動調降卡路里。`
-            });
+            const parsed = JSON.parse(clean);
+
+            const newFood = {
+              id: 'f_' + Date.now(),
+              name: parsed.name || aiFoodInput,
+              calories: Math.round(parsed.calories || 0),
+              protein: Number((parsed.protein || 0).toFixed(1)),
+              carbs: Number((parsed.carbs || 0).toFixed(1)),
+              fat: Number((parsed.fat || 0).toFixed(1))
+            };
+            updateCurrentDateRecord({ foods: [...dailyLog.foods, newFood] });
+            setAiFoodInput('');
+          } else {
+            alert('請先在頂部輸入 Gemini API Key 以啟用 AI 食材分析功能。');
           }
-        } else {
-          // Rule-based offline fallback
-          setAiDiagnosis({
-            trendFact: `當前 7 日滾動均線為 ${avg7} kg，30 天淨變動為 ${statsSummary.deltaWeight} kg。`,
-            decoupleAnalysis: `當日訓練容量為 ${latest.volume || 0} kg，單日體重波動 ${delta} kg 屬於肌肉發炎水腫與腸道殘留。`,
-            actionDirective: `無視單日裸測微幅上揚，維持每日 ${dailyLog.calories || 2100} kcal 飲食規劃。`
-          });
+        } catch (e) {
+          alert('AI 解析失敗，請檢查 API Key 或輸入格式。');
         }
-        setAiLoading(false);
+        setAiFoodLoading(false);
+      };
+
+      // 新增訓練組數
+      const handleAddWorkout = () => {
+        if (!exWeight || !exReps || !exSets) return;
+        const newWorkout = {
+          id: 'w_' + Date.now(),
+          category: selectedCategory,
+          name: selectedExercise,
+          weight: parseFloat(exWeight),
+          reps: parseInt(exReps),
+          sets: parseInt(exSets)
+        };
+        updateCurrentDateRecord({ workouts: [...dailyLog.workouts, newWorkout] });
+        setExWeight(''); setExReps(''); setExSets('');
       };
 
       return (
@@ -447,6 +279,16 @@
             </div>
             <div className="flex items-center gap-2">
               <input
+                type="password"
+                placeholder="API Key"
+                value={apiKey}
+                onChange={(e) => {
+                  setApiKey(e.target.value);
+                  localStorage.setItem('eq_gemini_key', e.target.value);
+                }}
+                className="bg-zinc-900 border border-zinc-800 text-[10px] text-zinc-300 rounded px-1.5 py-1 w-20 font-mono"
+              />
+              <input
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
@@ -455,64 +297,17 @@
             </div>
           </header>
 
-          {/* Data Reset & Mode Switch Strip */}
-          <div className="flex items-center justify-between text-[11px] bg-zinc-950 p-2 rounded-xl border border-zinc-800/80">
-            <span className="text-zinc-400">數據狀態: {records.length} 筆紀錄</span>
-            <div className="flex gap-2">
-              <button onClick={() => handleToggleDataMode('RESET_MOCK')} className="text-sky-400 hover:underline">載入測試數據</button>
-              <span className="text-zinc-700">|</span>
-              <button onClick={() => handleToggleDataMode('CLEAR')} className="text-rose-400 hover:underline">清空為空白</button>
-            </div>
-          </div>
-
           {/* TAB 1: ANALYTICS */}
           {activeTab === 'ANALYTICS' && (
             <div className="space-y-4">
-              {/* Timeframe Selector */}
-              <div className="flex bg-zinc-900 p-1 rounded-xl border border-zinc-800 justify-between text-xs font-mono">
-                {['7D', '30D', '90D', '180D', 'ALL'].map(tf => (
-                  <button
-                    key={tf}
-                    onClick={() => setTimeframe(tf)}
-                    className={`px-3 py-1 rounded-lg transition-all ${timeframe === tf ? 'bg-emerald-500 text-zinc-950 font-bold' : 'text-zinc-400'}`}
-                  >
-                    {tf}
-                  </button>
-                ))}
-              </div>
+              <AnalyticsChart data={[...records].sort((a,b)=>new Date(a.date)-new Date(b.date))} />
 
-              {/* Chart */}
-              <AnalyticsChart data={timeframeRecords} timeframe={timeframe} />
-
-              {/* Stats Grid */}
-              <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                <div className="bg-zinc-900 p-3 rounded-xl border border-zinc-800">
-                  <div className="text-zinc-400">區間體重淨變動</div>
-                  <div className={`text-base font-bold mt-1 ${statsSummary.deltaWeight <= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                    {statsSummary.deltaWeight > 0 ? `+${statsSummary.deltaWeight}` : statsSummary.deltaWeight} kg
-                  </div>
-                </div>
-                <div className="bg-zinc-900 p-3 rounded-xl border border-zinc-800">
-                  <div className="text-zinc-400">平均每日熱量</div>
-                  <div className="text-base font-bold text-zinc-200 mt-1">{statsSummary.avgCals} kcal</div>
-                </div>
-                <div className="bg-zinc-900 p-3 rounded-xl border border-zinc-800">
-                  <div className="text-zinc-400">平均蛋白質攝取</div>
-                  <div className="text-base font-bold text-sky-400 mt-1">{statsSummary.avgProtein} g</div>
-                </div>
-                <div className="bg-zinc-900 p-3 rounded-xl border border-zinc-800">
-                  <div className="text-zinc-400">平均每日訓練容量</div>
-                  <div className="text-base font-bold text-amber-400 mt-1">{statsSummary.avgVol} kg</div>
-                </div>
-              </div>
-
-              {/* Weight & Tag Rapid Logger */}
               <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3 space-y-2">
-                <div className="text-xs font-semibold text-zinc-200">當日體重與生理標籤 ({selectedDate})</div>
+                <div className="text-xs font-semibold text-zinc-200">當日裸測體重 ({selectedDate})</div>
                 <input
                   type="number"
                   step="0.1"
-                  placeholder="今日晨起裸測體重 (kg)"
+                  placeholder="今日裸測體重 (kg)"
                   value={dailyLog.weight}
                   onChange={(e) => updateCurrentDateRecord({ weight: e.target.value })}
                   className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs w-full text-zinc-100 font-mono"
@@ -538,103 +333,91 @@
             </div>
           )}
 
-          {/* TAB 2: DIET */}
+          {/* TAB 2: DIET & MACRO TARGETS */}
           {activeTab === 'DIET' && (
             <div className="space-y-3">
-              {/* Daily Summary */}
-              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3 grid grid-cols-4 gap-1 text-center font-mono">
-                <div>
-                  <div className="text-[10px] text-zinc-400">熱量</div>
-                  <div className="text-xs font-bold text-emerald-400 mt-1">{dailyLog.foods.reduce((s,f)=>s+f.calories,0)} kcal</div>
-                </div>
-                <div>
-                  <div className="text-[10px] text-zinc-400">蛋白質</div>
-                  <div className="text-xs font-bold text-sky-400 mt-1">{dailyLog.foods.reduce((s,f)=>s+f.protein,0)}g</div>
-                </div>
-                <div>
-                  <div className="text-[10px] text-zinc-400">碳水</div>
-                  <div className="text-xs font-bold text-amber-400 mt-1">{dailyLog.foods.reduce((s,f)=>s+f.carbs,0)}g</div>
-                </div>
-                <div>
-                  <div className="text-[10px] text-zinc-400">脂肪</div>
-                  <div className="text-xs font-bold text-rose-400 mt-1">{dailyLog.foods.reduce((s,f)=>s+f.fat,0)}g</div>
-                </div>
-              </div>
-
-              {/* Add Food Form */}
-              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3 space-y-2">
-                <div className="flex justify-between items-center text-xs font-semibold text-zinc-200">
-                  <span>新增飲食紀錄</span>
-                  <button onClick={() => setShowCustomFood(!showCustomFood)} className="text-[10px] text-sky-400 underline">
-                    {showCustomFood ? '選擇現有食材' : '+ 自訂新食材'}
+              
+              {/* Target vs Consumed Remaining Card */}
+              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3 space-y-3">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-semibold text-zinc-200">每日營養目標與剩餘配額</span>
+                  <button onClick={() => setShowTargetModal(true)} className="text-[10px] text-emerald-400 underline">
+                    修改目標設定
                   </button>
                 </div>
 
-                {!showCustomFood ? (
-                  <div className="space-y-2">
-                    <select
-                      value={selectedFoodId}
-                      onChange={(e) => setSelectedFoodId(e.target.value)}
-                      className="bg-zinc-950 border border-zinc-800 text-xs text-zinc-200 rounded-xl px-2 py-2 w-full"
-                    >
-                      <option value="">-- 選擇食材 (每100g數據) --</option>
-                      {foodCatalogue.map(f => (
-                        <option key={f.id} value={f.id}>{f.name} ({f.calories}kcal / P:{f.protein}g)</option>
-                      ))}
-                    </select>
-                    <div className="flex gap-2">
-                      <input
-                        type="number"
-                        placeholder="重量 (Gram)"
-                        value={foodGrams}
-                        onChange={(e) => setFoodGrams(e.target.value)}
-                        className="bg-zinc-950 border border-zinc-800 text-xs text-zinc-200 rounded-xl px-3 py-2 w-full font-mono"
-                      />
-                      <button onClick={handleAddFood} className="bg-emerald-500 text-zinc-950 font-bold px-4 text-xs rounded-xl whitespace-nowrap">
-                        加入
-                      </button>
+                <div className="grid grid-cols-4 gap-1 text-center font-mono text-xs">
+                  <div className="bg-zinc-950 p-2 rounded-xl border border-zinc-800">
+                    <div className="text-[10px] text-zinc-400">熱量剩餘</div>
+                    <div className={`font-bold mt-1 ${targets.calories - consumedTotals.calories < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                      {targets.calories - consumedTotals.calories} kcal
                     </div>
+                    <div className="text-[9px] text-zinc-500 mt-0.5">/ {targets.calories}</div>
                   </div>
-                ) : (
-                  <div className="space-y-2 text-xs">
-                    <input type="text" placeholder="食材名稱" value={customFood.name} onChange={e=>setCustomFood({...customFood, name: e.target.value})} className="bg-zinc-950 border border-zinc-800 p-2 rounded-xl w-full text-zinc-200" />
-                    <div className="grid grid-cols-2 gap-1 font-mono">
-                      <input type="number" placeholder="熱量 (kcal/100g)" value={customFood.calories} onChange={e=>setCustomFood({...customFood, calories: e.target.value})} className="bg-zinc-950 border border-zinc-800 p-2 rounded-xl text-zinc-200" />
-                      <input type="number" placeholder="蛋白質 (g/100g)" value={customFood.protein} onChange={e=>setCustomFood({...customFood, protein: e.target.value})} className="bg-zinc-950 border border-zinc-800 p-2 rounded-xl text-zinc-200" />
-                      <input type="number" placeholder="碳水 (g/100g)" value={customFood.carbs} onChange={e=>setCustomFood({...customFood, carbs: e.target.value})} className="bg-zinc-950 border border-zinc-800 p-2 rounded-xl text-zinc-200" />
-                      <input type="number" placeholder="脂肪 (g/100g)" value={customFood.fat} onChange={e=>setCustomFood({...customFood, fat: e.target.value})} className="bg-zinc-950 border border-zinc-800 p-2 rounded-xl text-zinc-200" />
+
+                  <div className="bg-zinc-950 p-2 rounded-xl border border-zinc-800">
+                    <div className="text-[10px] text-zinc-400">蛋白剩餘</div>
+                    <div className={`font-bold mt-1 ${targets.protein - consumedTotals.protein < 0 ? 'text-rose-400' : 'text-sky-400'}`}>
+                      {Number((targets.protein - consumedTotals.protein).toFixed(1))}g
                     </div>
-                    <button onClick={handleAddCustomFood} className="w-full bg-sky-500 text-zinc-950 font-bold py-2 rounded-xl text-xs">
-                      儲存食材至資料庫
-                    </button>
+                    <div className="text-[9px] text-zinc-500 mt-0.5">/ {targets.protein}g</div>
                   </div>
-                )}
+
+                  <div className="bg-zinc-950 p-2 rounded-xl border border-zinc-800">
+                    <div className="text-[10px] text-zinc-400">碳水剩餘</div>
+                    <div className={`font-bold mt-1 ${targets.carbs - consumedTotals.carbs < 0 ? 'text-rose-400' : 'text-amber-400'}`}>
+                      {Number((targets.carbs - consumedTotals.carbs).toFixed(1))}g
+                    </div>
+                    <div className="text-[9px] text-zinc-500 mt-0.5">/ {targets.carbs}g</div>
+                  </div>
+
+                  <div className="bg-zinc-950 p-2 rounded-xl border border-zinc-800">
+                    <div className="text-[10px] text-zinc-400">脂肪剩餘</div>
+                    <div className={`font-bold mt-1 ${targets.fat - consumedTotals.fat < 0 ? 'text-rose-400' : 'text-purple-400'}`}>
+                      {Number((targets.fat - consumedTotals.fat).toFixed(1))}g
+                    </div>
+                    <div className="text-[9px] text-zinc-500 mt-0.5">/ {targets.fat}g</div>
+                  </div>
+                </div>
               </div>
 
-              {/* Food List */}
+              {/* AI Food Input */}
               <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3 space-y-2">
-                <div className="text-xs font-semibold text-zinc-300">今日餐單</div>
+                <div className="text-xs font-semibold text-zinc-200">AI 自然語言食材輸入</div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="例如：雞胸肉 200g，白飯 150g，全蛋 2隻"
+                    value={aiFoodInput}
+                    onChange={(e) => setAiFoodInput(e.target.value)}
+                    className="bg-zinc-950 border border-zinc-800 text-xs text-zinc-200 rounded-xl px-3 py-2 w-full"
+                  />
+                  <button
+                    onClick={handleAnalyzeFoodAI}
+                    disabled={aiFoodLoading}
+                    className="bg-emerald-500 text-zinc-950 font-bold px-3 text-xs rounded-xl whitespace-nowrap"
+                  >
+                    {aiFoodLoading ? '計算中...' : 'AI 分析'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Today's Food List */}
+              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3 space-y-2">
+                <div className="text-xs font-semibold text-zinc-300">今日攝取清單</div>
                 {dailyLog.foods.length === 0 ? (
-                  <div className="text-xs text-zinc-500 py-2 text-center">尚無飲食紀錄</div>
+                  <div className="text-xs text-zinc-500 py-2 text-center">尚無紀錄</div>
                 ) : (
                   <div className="space-y-1.5">
                     {dailyLog.foods.map((f, i) => (
                       <div key={f.id || i} className="flex justify-between items-center bg-zinc-950 p-2 rounded-xl text-xs font-mono">
                         <div>
-                          <div className="text-zinc-200 font-sans font-medium">{f.name} ({f.grams}g)</div>
+                          <div className="text-zinc-200 font-sans font-medium">{f.name}</div>
                           <div className="text-[10px] text-zinc-500">P:{f.protein}g | C:{f.carbs}g | F:{f.fat}g</div>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-emerald-400 font-bold">{f.calories} kcal</span>
-                          <button
-                            onClick={() => {
-                              const newFoods = dailyLog.foods.filter((_, idx) => idx !== i);
-                              updateCurrentDateRecord({ foods: newFoods });
-                            }}
-                            className="text-rose-500 px-1"
-                          >
-                            ×
-                          </button>
+                          <button onClick={() => updateCurrentDateRecord({ foods: dailyLog.foods.filter((_, idx) => idx !== i) })} className="text-rose-500 px-1">×</button>
                         </div>
                       </div>
                     ))}
@@ -644,32 +427,51 @@
             </div>
           )}
 
-          {/* TAB 3: WORKOUT */}
+          {/* TAB 3: WORKOUT (Menu-based) */}
           {activeTab === 'WORKOUT' && (
             <div className="space-y-3">
-              {/* Total Volume Banner */}
-              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3 flex justify-between items-center">
-                <span className="text-xs text-zinc-400">當日總訓練容量 (Volume)</span>
-                <span className="text-base font-bold font-mono text-amber-400">
-                  {dailyLog.workouts.reduce((s, w) => s + (w.weight * w.reps * w.sets), 0)} kg
-                </span>
-              </div>
-
-              {/* Add Workout Form */}
               <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3 space-y-2">
-                <div className="text-xs font-semibold text-zinc-200">紀錄訓練動作</div>
-                <input
-                  type="text"
-                  placeholder="動作名稱 (例：槓鈴臥推)"
-                  value={exerciseName}
-                  onChange={e => setExerciseName(e.target.value)}
-                  className="bg-zinc-950 border border-zinc-800 text-xs text-zinc-200 rounded-xl p-2 w-full"
-                />
-                <div className="grid grid-cols-3 gap-1 font-mono">
+                <div className="text-xs font-semibold text-zinc-200">選單式部位與動作紀錄</div>
+                
+                {/* 部位選單 */}
+                <div className="space-y-1">
+                  <label className="text-[10px] text-zinc-400">訓練部位</label>
+                  <select
+                    value={selectedCategory}
+                    onChange={(e) => {
+                      const cat = e.target.value;
+                      setSelectedCategory(cat);
+                      setSelectedExercise(WORKOUT_EXERCISES[cat][0]);
+                    }}
+                    className="bg-zinc-950 border border-zinc-800 text-xs text-zinc-200 rounded-xl p-2 w-full"
+                  >
+                    {Object.keys(WORKOUT_EXERCISES).map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 動作選單 */}
+                <div className="space-y-1">
+                  <label className="text-[10px] text-zinc-400">動作項目</label>
+                  <select
+                    value={selectedExercise}
+                    onChange={(e) => setSelectedExercise(e.target.value)}
+                    className="bg-zinc-950 border border-zinc-800 text-xs text-zinc-200 rounded-xl p-2 w-full"
+                  >
+                    {WORKOUT_EXERCISES[selectedCategory].map(ex => (
+                      <option key={ex} value={ex}>{ex}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 重量與組數 */}
+                <div className="grid grid-cols-3 gap-1 font-mono pt-1">
                   <input type="number" placeholder="重量 (kg)" value={exWeight} onChange={e => setExWeight(e.target.value)} className="bg-zinc-950 border border-zinc-800 text-xs p-2 rounded-xl text-zinc-200" />
                   <input type="number" placeholder="次數 (Reps)" value={exReps} onChange={e => setExReps(e.target.value)} className="bg-zinc-950 border border-zinc-800 text-xs p-2 rounded-xl text-zinc-200" />
                   <input type="number" placeholder="組數 (Sets)" value={exSets} onChange={e => setExSets(e.target.value)} className="bg-zinc-950 border border-zinc-800 text-xs p-2 rounded-xl text-zinc-200" />
                 </div>
+
                 <button onClick={handleAddWorkout} className="w-full bg-amber-500 text-zinc-950 font-bold py-2 rounded-xl text-xs">
                   新增組數容量
                 </button>
@@ -677,28 +479,20 @@
 
               {/* Workout List */}
               <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3 space-y-2">
-                <div className="text-xs font-semibold text-zinc-300">今日訓練清單</div>
+                <div className="text-xs font-semibold text-zinc-300">今日訓練紀錄</div>
                 {dailyLog.workouts.length === 0 ? (
-                  <div className="text-xs text-zinc-500 py-2 text-center">尚無訓練紀錄</div>
+                  <div className="text-xs text-zinc-500 py-2 text-center">尚無紀錄</div>
                 ) : (
                   <div className="space-y-1.5">
                     {dailyLog.workouts.map((w, i) => (
                       <div key={w.id || i} className="flex justify-between items-center bg-zinc-950 p-2 rounded-xl text-xs font-mono">
                         <div>
-                          <div className="text-zinc-200 font-sans font-medium">{w.name}</div>
+                          <div className="text-zinc-200 font-sans font-medium">[{w.category?.split(' ')[0]}] {w.name}</div>
                           <div className="text-[10px] text-zinc-500">{w.weight} kg × {w.reps} 次 × {w.sets} 組</div>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-amber-400 font-bold">{w.weight * w.reps * w.sets} kg</span>
-                          <button
-                            onClick={() => {
-                              const newW = dailyLog.workouts.filter((_, idx) => idx !== i);
-                              updateCurrentDateRecord({ workouts: newW });
-                            }}
-                            className="text-rose-500 px-1"
-                          >
-                            ×
-                          </button>
+                          <button onClick={() => updateCurrentDateRecord({ workouts: dailyLog.workouts.filter((_, idx) => idx !== i) })} className="text-rose-500 px-1">×</button>
                         </div>
                       </div>
                     ))}
@@ -708,78 +502,42 @@
             </div>
           )}
 
-          {/* TAB 4: DIAGNOSIS */}
-          {activeTab === 'DIAGNOSIS' && (
-            <div className="space-y-3">
-              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3 space-y-2">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="font-semibold text-zinc-200">Gemini 冷酷診斷</span>
-                  <input
-                    type="password"
-                    placeholder="API Key (可空)"
-                    value={apiKey}
-                    onChange={(e) => {
-                      setApiKey(e.target.value);
-                      localStorage.setItem('eq_gemini_key', e.target.value);
-                    }}
-                    className="bg-zinc-950 border border-zinc-800 px-2 py-1 rounded text-[10px] w-28 font-mono text-zinc-300"
-                  />
+          {/* Modal for Targets Setting */}
+          {showTargetModal && (
+            <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 w-full max-w-xs space-y-3">
+                <h3 className="font-bold text-sm text-zinc-100">設定每日營養目標</h3>
+                <div className="space-y-2 text-xs font-mono">
+                  <div>
+                    <label className="text-[10px] text-zinc-400">總熱量 Target (kcal)</label>
+                    <input type="number" value={targets.calories} onChange={e=>setTargets({...targets, calories: parseInt(e.target.value)||0})} className="bg-zinc-950 border border-zinc-800 rounded-xl p-2 w-full text-zinc-200 mt-0.5" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-zinc-400">蛋白質 Target (g)</label>
+                    <input type="number" value={targets.protein} onChange={e=>setTargets({...targets, protein: parseInt(e.target.value)||0})} className="bg-zinc-950 border border-zinc-800 rounded-xl p-2 w-full text-zinc-200 mt-0.5" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-zinc-400">碳水化合物 Target (g)</label>
+                    <input type="number" value={targets.carbs} onChange={e=>setTargets({...targets, carbs: parseInt(e.target.value)||0})} className="bg-zinc-950 border border-zinc-800 rounded-xl p-2 w-full text-zinc-200 mt-0.5" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-zinc-400">脂肪 Target (g)</label>
+                    <input type="number" value={targets.fat} onChange={e=>setTargets({...targets, fat: parseInt(e.target.value)||0})} className="bg-zinc-950 border border-zinc-800 rounded-xl p-2 w-full text-zinc-200 mt-0.5" />
+                  </div>
                 </div>
-                <button
-                  onClick={handleGenerateAI}
-                  disabled={aiLoading}
-                  className="w-full py-2 bg-emerald-950/60 border border-emerald-800 text-emerald-300 font-bold rounded-xl text-xs"
-                >
-                  {aiLoading ? '分析中...' : '生成客觀生理學診斷'}
+                <button onClick={() => setShowTargetModal(false)} className="w-full bg-emerald-500 text-zinc-950 font-bold py-2 rounded-xl text-xs">
+                  儲存目標
                 </button>
               </div>
-
-              {aiDiagnosis && (
-                <div className="space-y-2 text-xs">
-                  <div className="bg-zinc-900 p-3 rounded-2xl border border-zinc-800 space-y-1">
-                    <span className="text-emerald-400 font-bold block">📌 走向事實</span>
-                    <p className="text-zinc-300">{aiDiagnosis.trendFact}</p>
-                  </div>
-                  <div className="bg-zinc-900 p-3 rounded-2xl border border-zinc-800 space-y-1">
-                    <span className="text-amber-400 font-bold block">🧪 水分與發炎解耦</span>
-                    <p className="text-zinc-300">{aiDiagnosis.decoupleAnalysis}</p>
-                  </div>
-                  <div className="bg-emerald-950/30 p-3 rounded-2xl border border-emerald-800/60 space-y-1">
-                    <span className="text-emerald-300 font-bold block">🎯 行動校準指令</span>
-                    <p className="text-zinc-100 font-medium">{aiDiagnosis.actionDirective}</p>
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
-          {/* Bottom Fixed Navigation */}
+          {/* Fixed Navigation */}
           <nav className="fixed bottom-0 left-0 right-0 bg-zinc-950/95 border-t border-zinc-800 backdrop-blur-md">
             <div className="max-w-md mx-auto flex justify-around py-2 text-[10px]">
-              <button
-                onClick={() => setActiveTab('ANALYTICS')}
-                className={`flex flex-col items-center gap-1 ${activeTab === 'ANALYTICS' ? 'text-emerald-400 font-bold' : 'text-zinc-500'}`}
-              >
-                📊 趨勢圖表
-              </button>
-              <button
-                onClick={() => setActiveTab('DIET')}
-                className={`flex flex-col items-center gap-1 ${activeTab === 'DIET' ? 'text-emerald-400 font-bold' : 'text-zinc-500'}`}
-              >
-                🥗 飲食計算
-              </button>
-              <button
-                onClick={() => setActiveTab('WORKOUT')}
-                className={`flex flex-col items-center gap-1 ${activeTab === 'WORKOUT' ? 'text-emerald-400 font-bold' : 'text-zinc-500'}`}
-              >
-                🏋️ 訓練容量
-              </button>
-              <button
-                onClick={() => setActiveTab('DIAGNOSIS')}
-                className={`flex flex-col items-center gap-1 ${activeTab === 'DIAGNOSIS' ? 'text-emerald-400 font-bold' : 'text-zinc-500'}`}
-              >
-                🧠 理性診斷
-              </button>
+              <button onClick={() => setActiveTab('ANALYTICS')} className={`flex flex-col items-center ${activeTab === 'ANALYTICS' ? 'text-emerald-400 font-bold' : 'text-zinc-500'}`}>📊 體重去噪</button>
+              <button onClick={() => setActiveTab('DIET')} className={`flex flex-col items-center ${activeTab === 'DIET' ? 'text-emerald-400 font-bold' : 'text-zinc-500'}`}>🥗 飲食與目標</button>
+              <button onClick={() => setActiveTab('WORKOUT')} className={`flex flex-col items-center ${activeTab === 'WORKOUT' ? 'text-emerald-400 font-bold' : 'text-zinc-500'}`}>🏋️ 訓練選單</button>
             </div>
           </nav>
 
