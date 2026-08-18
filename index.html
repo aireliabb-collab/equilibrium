@@ -3,13 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Equilibrium - 去噪生理學與訓練系統</title>
+  <title>Equilibrium - 體重與食物訓練系統</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
     body { background-color: #09090b; color: #f4f4f5; }
@@ -22,13 +21,220 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useEffect, useMemo, useRef } = React;
+    const { useState, useEffect, useMemo } = React;
 
-    // 內建常見食物大數據庫 (每 100g 營養素)
+    // 內建食材數據庫 (每 100g 含量)
     const FOOD_DATABASE = [
       { keywords: ['雞胸肉', '雞胸'], name: '雞胸肉', cals: 165, p: 31, c: 0, f: 3.6 },
       { keywords: ['白飯', '米飯', '飯'], name: '白飯', cals: 130, p: 2.7, c: 28, f: 0.3 },
       { keywords: ['雞蛋', '蛋'], name: '雞蛋', cals: 143, p: 12.6, c: 0.7, f: 9.5 },
       { keywords: ['牛肉', '牛扒', '牛'], name: '牛肉', cals: 250, p: 26, c: 0, f: 15 },
       { keywords: ['三文魚', '鮭魚'], name: '三文魚', cals: 208, p: 20, c: 0, f: 13 },
-      {
+      { keywords: ['燕麥', '麥片'], name: '燕麥', cals: 389, p: 16.9, c: 66, f: 6.9 },
+      { keywords: ['牛奶', '鮮奶'], name: '牛奶', cals: 60, p: 3.2, c: 4.8, f: 3.2.5 },
+      { keywords: ['香蕉'], name: '香蕉', cals: 89, p: 1.1, c: 23, f: 0.3 },
+      { keywords: ['蛋白粉', '乳清蛋白'], name: '蛋白粉', cals: 370, p: 75, c: 8, f: 4 }
+    ];
+
+    // 本地靜態解析器 (不需 API Key)
+    const parseFoodInput = (text) => {
+      let total = { cals: 0, p: 0, c: 0, f: 0 };
+      const lines = text.split(/[,，\n]/);
+
+      lines.forEach(line => {
+        if (!line.trim()) return;
+        const weightMatch = line.match(/(\d+)\s*(g|克)?/i);
+        const weight = weightMatch ? parseFloat(weightMatch[1]) : 100; // 預設 100g
+
+        const matchedItem = FOOD_DATABASE.find(item => 
+          item.keywords.some(kw => line.includes(kw))
+        );
+
+        if (matchedItem) {
+          const ratio = weight / 100;
+          total.cals += matchedItem.cals * ratio;
+          total.p += matchedItem.p * ratio;
+          total.c += matchedItem.c * ratio;
+          total.f += matchedItem.f * ratio;
+        }
+      });
+
+      return {
+        cals: Math.round(total.cals),
+        p: Math.round(total.p),
+        c: Math.round(total.c),
+        f: Math.round(total.f)
+      };
+    };
+
+    function App() {
+      // 1. 日子管理 (跨日重新開啟時會是當天)
+      const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
+      
+      // 2. 體重 (按鈕微調式)
+      const [weight, setWeight] = useState(70.0);
+
+      // 3. 健身項目 (選單 + 自訂)
+      const [exerciseCategory, setExerciseCategory] = useState('臥推');
+      const [customExercise, setCustomExercise] = useState('');
+      const [reps, setReps] = useState(10);
+      const [exWeight, setExWeight] = useState(60);
+      const [workoutList, setWorkoutList] = useState([]);
+
+      // 4. 食物輸入 (靜態大數據分析)
+      const [foodInput, setFoodInput] = useState('');
+      const [nutrition, setNutrition] = useState({ cals: 0, p: 0, c: 0, f: 0 });
+
+      // 體重微調處理
+      const adjustWeight = (amount) => {
+        setWeight(prev => parseFloat((Math.max(30, prev + amount)).toFixed(1)));
+      };
+
+      // 新增訓練項目
+      const handleAddWorkout = () => {
+        const finalName = exerciseCategory === '自訂' ? customExercise.trim() : exerciseCategory;
+        if (!finalName) return;
+
+        setWorkoutList([...workoutList, { name: finalName, reps, weight: exWeight, id: Date.now() }]);
+        if (exerciseCategory === '自訂') setCustomExercise('');
+      };
+
+      // 解析食物輸入
+      const handleAnalyzeFood = () => {
+        const result = parseFoodInput(foodInput);
+        setNutrition(result);
+      };
+      return (
+        <div class="max-w-md mx-auto p-4 space-y-6">
+          <header class="flex justify-between items-center border-b border-zinc-800 pb-3">
+            <h1 class="text-xl font-bold text-zinc-100">Equilibrium 追蹤系統</h1>
+            <input 
+              type="date" 
+              value={selectedDate} 
+              onChange={(e) => setSelectedDate(e.target.value)}
+              class="bg-zinc-800 text-zinc-200 text-sm px-2 py-1 rounded border border-zinc-700"
+            />
+          </header>
+
+          {/* 1. 按鈕式體重輸入區 */}
+          <section class="bg-zinc-900 border border-zinc-800 p-4 rounded-xl space-y-3">
+            <label class="text-xs text-zinc-400 font-semibold uppercase">每日體重 (kg)</label>
+            <div class="flex items-center justify-between">
+              <div class="text-3xl font-extrabold text-amber-400">{weight.toFixed(1)} <span class="text-sm font-normal text-zinc-400">kg</span></div>
+              <div class="flex gap-1.5">
+                <button onClick={() => adjustWeight(-0.5)} class="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-2.5 py-1.5 rounded font-bold text-sm">-0.5</button>
+                <button onClick={() => adjustWeight(-0.1)} class="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-2.5 py-1.5 rounded font-bold text-sm">-0.1</button>
+                <button onClick={() => adjustWeight(0.1)} class="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-2.5 py-1.5 rounded font-bold text-sm">+0.1</button>
+                <button onClick={() => adjustWeight(0.5)} class="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-2.5 py-1.5 rounded font-bold text-sm">+0.5</button>
+              </div>
+            </div>
+          </section>
+
+          {/* 2. 健身項目 (支援自訂) */}
+          <section class="bg-zinc-900 border border-zinc-800 p-4 rounded-xl space-y-3">
+            <label class="text-xs text-zinc-400 font-semibold uppercase">健身紀錄</label>
+            <div class="grid grid-cols-2 gap-2">
+              <select 
+                value={exerciseCategory} 
+                onChange={(e) => setExerciseCategory(e.target.value)}
+                class="bg-zinc-800 text-zinc-200 p-2 rounded border border-zinc-700 text-sm"
+              >
+                <option value="臥推">臥推</option>
+                <option value="深蹲">深蹲</option>
+                <option value="硬舉">硬舉</option>
+                <option value="肩推">肩推</option>
+                <option value="引體向上">引體向上</option>
+                <option value="自訂">自訂項目...</option>
+              </select>
+
+              {exerciseCategory === '自訂' && (
+                <input 
+                  type="text" 
+                  placeholder="輸入動作名稱" 
+                  value={customExercise}
+                  onChange={(e) => setCustomExercise(e.target.value)}
+                  class="bg-zinc-800 text-zinc-200 p-2 rounded border border-zinc-700 text-sm"
+                />
+              )}
+            </div>
+
+            <div class="flex gap-2">
+              <input 
+                type="number" 
+                placeholder="重量 (kg)" 
+                value={exWeight} 
+                onChange={(e) => setExWeight(Number(e.target.value))}
+                class="w-1/2 bg-zinc-800 text-zinc-200 p-2 rounded border border-zinc-700 text-sm"
+              />
+              <input 
+                type="number" 
+                placeholder="次數" 
+                value={reps} 
+                onChange={(e) => setReps(Number(e.target.value))}
+                class="w-1/2 bg-zinc-800 text-zinc-200 p-2 rounded border border-zinc-700 text-sm"
+              />
+            </div>
+
+            <button 
+              onClick={handleAddWorkout}
+              class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2 rounded text-sm transition"
+            >
+              加入紀錄
+            </button>
+
+            {workoutList.length > 0 && (
+              <ul class="divide-y divide-zinc-800 pt-2">
+                {workoutList.map(item => (
+                  <li key={item.id} class="py-1.5 flex justify-between text-sm text-zinc-300">
+                    <span>{item.name}</span>
+                    <span class="font-mono text-zinc-400">{item.weight} kg × {item.reps} 次</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          {/* 3. 食物大數據免 API 分析 */}
+          <section class="bg-zinc-900 border border-zinc-800 p-4 rounded-xl space-y-3">
+            <label class="text-xs text-zinc-400 font-semibold uppercase">飲食大數據解析 (免 API Key)</label>
+            <textarea 
+              rows="2"
+              placeholder="例如：雞胸肉 200g，白飯 150g" 
+              value={foodInput}
+              onChange={(e) => setFoodInput(e.target.value)}
+              class="w-full bg-zinc-800 text-zinc-200 p-2 rounded border border-zinc-700 text-sm resize-none"
+            />
+            <button 
+              onClick={handleAnalyzeFood}
+              class="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-2 rounded text-sm transition"
+            >
+              計算營養成分
+            </button>
+
+            <div class="grid grid-cols-4 gap-2 pt-2 text-center">
+              <div class="bg-zinc-800 p-2 rounded">
+                <div class="text-xs text-zinc-500">卡路里</div>
+                <div class="text-sm font-bold text-zinc-200">{nutrition.cals}</div>
+              </div>
+              <div class="bg-zinc-800 p-2 rounded">
+                <div class="text-xs text-zinc-500">蛋白質</div>
+                <div class="text-sm font-bold text-emerald-400">{nutrition.p}g</div>
+              </div>
+              <div class="bg-zinc-800 p-2 rounded">
+                <div class="text-xs text-zinc-500">碳水</div>
+                <div class="text-sm font-bold text-amber-400">{nutrition.c}g</div>
+              </div>
+              <div class="bg-zinc-800 p-2 rounded">
+                <div class="text-xs text-zinc-500">脂肪</div>
+                <div class="text-sm font-bold text-rose-400">{nutrition.f}g</div>
+              </div>
+            </div>
+          </section>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
