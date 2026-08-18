@@ -9,12 +9,12 @@
   <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", sans-serif; -webkit-tap-highlight-color: transparent; background-color: #0c0a09; color: #f5f5f4; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", sans-serif; -webkit-tap-highlight-color: transparent; background-color: #f4f4f5; color: #18181b; }
     ::-webkit-scrollbar { display: none; }
     .safe-bottom { padding-bottom: calc(75px + env(safe-area-inset-bottom)); }
-    .calm-card { background: linear-gradient(145deg, #1c1917 0%, #12100e 100%); border: 1px solid rgba(41, 37, 36, 0.8); }
-    .calm-input { background-color: #171513; border: 1px solid #292524; color: #e7e5e4; }
-    .calm-input:focus { border-color: #57534e; outline: none; }
+    .calm-card { background: #ffffff; border: 1px solid #e4e4e7; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05); }
+    .calm-input { background-color: #fafafa; border: 1px solid #d4d4d8; color: #18181b; }
+    .calm-input:focus { border-color: #71717a; outline: none; background-color: #ffffff; }
   </style>
 </head>
 <body class="min-h-screen">
@@ -82,9 +82,9 @@
     const repsOptions = Array.from({length: 50}, (_, i) => i + 1);
     const setsOptions = Array.from({length: 10}, (_, i) => i + 1);
 
-    function TrendChart({ data, yKey, color = "#d6d3d1", formatY = (v) => v }) {
-      if (!data || data.length === 0) return <div className="h-28 flex items-center justify-center text-[11px] text-stone-600 calm-card rounded-lg">尚無足夠軌跡紀錄</div>;
-      if (data.length === 1) return <div className="h-28 flex items-center justify-center text-[11px] text-stone-500 calm-card rounded-lg">目前基準：{formatY(data[0][yKey])}</div>;
+    function TrendChart({ data, yKey, color = "#52525b", formatY = (v) => v }) {
+      if (!data || data.length === 0) return <div className="h-28 flex items-center justify-center text-[11px] text-zinc-400 calm-card rounded-lg">尚無足夠軌跡紀錄</div>;
+      if (data.length === 1) return <div className="h-28 flex items-center justify-center text-[11px] text-zinc-500 calm-card rounded-lg">目前基準：{formatY(data[0][yKey])}</div>;
 
       const padding = { top: 12, bottom: 12, left: 8, right: 8 };
       const width = 400; const height = 110;
@@ -100,13 +100,13 @@
 
       return (
         <div className="relative w-full overflow-hidden calm-card rounded-lg pt-1">
-          <div className="absolute top-1 left-2 text-[9px] text-stone-500 font-mono">高: {formatY(maxVal)} | 低: {formatY(minVal)}</div>
+          <div className="absolute top-1 left-2 text-[9px] text-zinc-400 font-mono">高: {formatY(maxVal)} | 低: {formatY(minVal)}</div>
           <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-28">
-            <polyline points={points} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.8" />
+            <polyline points={points} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             {data.map((d, i) => {
               const x = padding.left + (i / (data.length - 1)) * (width - padding.left - padding.right);
               const y = height - padding.bottom - ((d[yKey] - minVal) / range) * (height - padding.top - padding.bottom);
-              return <circle key={i} cx={x} cy={y} r="2.5" fill="#1c1917" stroke={color} strokeWidth="1.5" />;
+              return <circle key={i} cx={x} cy={y} r="2.5" fill="#ffffff" stroke={color} strokeWidth="1.5" />;
             })}
           </svg>
         </div>
@@ -130,6 +130,8 @@
 
       const Dashboard = () => {
         const [weightRange, setWeightRange] = useState(30);
+        const [workoutRange, setWorkoutRange] = useState(30);
+
         const todayWeight = weightHistory[selectedDate] || (() => {
           const dates = Object.keys(weightHistory).sort();
           return dates.length > 0 ? weightHistory[dates[dates.length - 1]] : 70.0;
@@ -142,6 +144,17 @@
           return Object.entries(weightHistory).filter(([d]) => new Date(d).getTime() >= cutoff).sort((a, b) => a[0].localeCompare(b[0])).map(([date, weight]) => ({ date, weight }));
         }, [weightHistory, weightRange]);
 
+        const workoutChartData = useMemo(() => {
+          const cutoff = new Date().getTime() - (workoutRange * 24 * 60 * 60 * 1000);
+          return Object.entries(workoutsData)
+            .filter(([d]) => new Date(d).getTime() >= cutoff)
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map(([date, items]) => {
+              const totalVolume = items.reduce((sum, item) => sum + (item.weight * item.reps * item.sets), 0);
+              return { date, volume: totalVolume };
+            });
+        }, [workoutsData, workoutRange]);
+
         const todayNutri = nutritionData[selectedDate] || [];
         const sumP = todayNutri.reduce((acc, i) => acc + i.p, 0);
         const sumC = todayNutri.reduce((acc, i) => acc + i.c, 0);
@@ -150,49 +163,63 @@
 
         return (
           <div className="space-y-3 pb-4">
-            <div className="calm-card rounded-xl p-3 border-stone-800/60 bg-stone-900/40">
-              <p className="text-[11px] text-stone-400 italic">“ {dailyQuote} ”</p>
+            <div className="calm-card rounded-xl p-3 bg-white">
+              <p className="text-[11px] text-zinc-600 italic">“ {dailyQuote} ”</p>
             </div>
 
-            <div className="calm-card rounded-xl p-3 flex items-center justify-between">
+            <div className="calm-card rounded-xl p-3 flex items-center justify-between bg-white">
               <div>
-                <span className="text-[10px] text-stone-400 uppercase tracking-wider block">今日體重基準</span>
-                <span className="text-2xl font-bold font-mono text-stone-200">{todayWeight.toFixed(1)} <span className="text-xs text-stone-500 font-sans">kg</span></span>
+                <span className="text-[10px] text-zinc-500 uppercase tracking-wider block">今日體重基準</span>
+                <span className="text-2xl font-bold font-mono text-zinc-800">{todayWeight.toFixed(1)} <span className="text-xs text-zinc-500 font-sans">kg</span></span>
               </div>
               <div className="grid grid-cols-6 gap-1">
                 {[-1.0, -0.5, -0.1, +0.1, +0.5, +1.0].map(val => (
                   <button key={val} onClick={() => handleAdjust(val)}
-                    className={`px-2 py-1.5 rounded text-[11px] font-bold active:scale-95 border transition ${val > 0 ? 'bg-stone-800/60 text-stone-300 border-stone-700/60 hover:bg-stone-800' : 'bg-stone-900/60 text-stone-400 border-stone-800 hover:bg-stone-900'}`}>
+                    className={`px-2 py-1.5 rounded text-[11px] font-bold active:scale-95 border transition ${val > 0 ? 'bg-zinc-100 text-zinc-700 border-zinc-300 hover:bg-zinc-200' : 'bg-zinc-50 text-zinc-600 border-zinc-200 hover:bg-zinc-100'}`}>
                     {val > 0 ? `+${val}` : val}
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="calm-card rounded-xl p-3">
+            <div className="calm-card rounded-xl p-3 bg-white">
               <div className="flex justify-between items-center mb-1.5">
-                <span className="text-[10px] text-stone-400 uppercase tracking-wider">今日營養累積</span>
-                <span className="text-xs font-mono font-bold text-stone-300">{round1(sumKcal)} <span className="text-[10px] text-stone-500">kcal</span></span>
+                <span className="text-[10px] text-zinc-500 uppercase tracking-wider">今日營養累積</span>
+                <span className="text-xs font-mono font-bold text-zinc-700">{round1(sumKcal)} <span className="text-[10px] text-zinc-400">kcal</span></span>
               </div>
               <div className="grid grid-cols-3 gap-2 text-[11px]">
-                <div className="bg-stone-950/40 p-2 rounded-lg border border-stone-900"><span className="text-stone-500 block text-[9px]">蛋白質 (P)</span><span className="font-mono font-bold text-stone-300">{round1(sumP)}g</span></div>
-                <div className="bg-stone-950/40 p-2 rounded-lg border border-stone-900"><span className="text-stone-500 block text-[9px]">碳水 (C)</span><span className="font-mono font-bold text-stone-400">{round1(sumC)}g</span></div>
-                <div className="bg-stone-950/40 p-2 rounded-lg border border-stone-900"><span className="text-stone-500 block text-[9px]">脂肪 (F)</span><span className="font-mono font-bold text-stone-500">{round1(sumF)}g</span></div>
+                <div className="bg-zinc-50 p-2 rounded-lg border border-zinc-200"><span className="text-zinc-500 block text-[9px]">蛋白質 (P)</span><span className="font-mono font-bold text-zinc-700">{round1(sumP)}g</span></div>
+                <div className="bg-zinc-50 p-2 rounded-lg border border-zinc-200"><span className="text-zinc-500 block text-[9px]">碳水 (C)</span><span className="font-mono font-bold text-zinc-700">{round1(sumC)}g</span></div>
+                <div className="bg-zinc-50 p-2 rounded-lg border border-zinc-200"><span className="text-zinc-500 block text-[9px]">脂肪 (F)</span><span className="font-mono font-bold text-zinc-700">{round1(sumF)}g</span></div>
               </div>
             </div>
 
-            <div className="calm-card rounded-xl p-3">
+            <div className="calm-card rounded-xl p-3 bg-white">
               <div className="flex justify-between items-center mb-2">
-                <span className="text-[10px] text-stone-400 uppercase tracking-wider">體重軌跡</span>
+                <span className="text-[10px] text-zinc-500 uppercase tracking-wider">體重軌跡</span>
                 <div className="flex gap-1">
                   {[7, 30, 90].map(days => (
-                    <button key={days} onClick={() => setWeightRange(days)} className={`px-2 py-0.5 rounded text-[10px] font-medium border transition ${weightRange === days ? 'bg-stone-800 text-stone-200 border-stone-700' : 'bg-transparent text-stone-500 border-transparent'}`}>
+                    <button key={days} onClick={() => setWeightRange(days)} className={`px-2 py-0.5 rounded text-[10px] font-medium border transition ${weightRange === days ? 'bg-zinc-200 text-zinc-800 border-zinc-300' : 'bg-transparent text-zinc-400 border-transparent'}`}>
                       {days === 7 ? '近週' : days === 30 ? '近月' : '近季'}
                     </button>
                   ))}
                 </div>
               </div>
               <TrendChart data={weightChartData} yKey="weight" formatY={v => `${v}kg`} />
+            </div>
+
+            <div className="calm-card rounded-xl p-3 bg-white">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-[10px] text-zinc-500 uppercase tracking-wider">健身總容量軌跡 (Volume)</span>
+                <div className="flex gap-1">
+                  {[7, 30, 90].map(days => (
+                    <button key={days} onClick={() => setWorkoutRange(days)} className={`px-2 py-0.5 rounded text-[10px] font-medium border transition ${workoutRange === days ? 'bg-zinc-200 text-zinc-800 border-zinc-300' : 'bg-transparent text-zinc-400 border-transparent'}`}>
+                      {days === 7 ? '近週' : days === 30 ? '近月' : '近季'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <TrendChart data={workoutChartData} yKey="volume" color="#71717a" formatY={v => `${v}kg`} />
             </div>
           </div>
         );
@@ -228,7 +255,7 @@
 
         return (
           <div className="space-y-3 pb-4">
-            <div className="calm-card rounded-xl p-3 space-y-2.5 relative">
+            <div className="calm-card rounded-xl p-3 space-y-2.5 relative bg-white">
               <div className="relative">
                 <input 
                   type="text" 
@@ -237,22 +264,22 @@
                   onChange={e => setSearchTerm(e.target.value)}
                   onFocus={() => setIsFocused(true)}
                   onBlur={() => setTimeout(() => setIsFocused(false), 250)}
-                  className="w-full calm-input p-2.5 rounded-lg text-xs text-stone-200"
+                  className="w-full calm-input p-2.5 rounded-lg text-xs text-zinc-800"
                 />
                 {isFocused && suggestions.length > 0 && (
-                  <div className="absolute left-0 right-0 z-20 bg-stone-900 border border-stone-800 rounded-lg max-h-36 overflow-y-auto shadow-2xl mt-1">
+                  <div className="absolute left-0 right-0 z-20 bg-white border border-zinc-200 rounded-lg max-h-36 overflow-y-auto shadow-lg mt-1">
                     {suggestions.map(f => (
                       <div 
                         key={f.name} 
                         onMouseDown={(e) => {
-                          e.preventDefault(); // 防止 input 失焦導致點擊失效
+                          e.preventDefault();
                           setSelectedFood(f); 
                           setSearchTerm(f.name);
                           setIsFocused(false);
                         }} 
-                        className="p-2.5 text-xs cursor-pointer hover:bg-stone-800 border-b border-stone-800/50 last:border-0 text-stone-300"
+                        className="p-2.5 text-xs cursor-pointer hover:bg-zinc-100 border-b border-zinc-100 last:border-0 text-zinc-700"
                       >
-                        {f.name} <span className="text-[10px] text-stone-500 ml-1">({f.unit})</span>
+                        {f.name} <span className="text-[10px] text-zinc-400 ml-1">({f.unit})</span>
                       </div>
                     ))}
                   </div>
@@ -267,21 +294,21 @@
                   placeholder={selectedFood.unit === "g" ? "重量 (g)" : "數量 (隻)"} 
                   className="w-2/3 calm-input p-2.5 rounded-lg text-xs font-mono" 
                 />
-                <button onClick={handleAdd} className="w-1/3 bg-stone-200 text-stone-950 font-bold py-2.5 rounded-lg text-xs active:scale-95 transition hover:bg-white">加入紀錄</button>
+                <button onClick={handleAdd} className="w-1/3 bg-zinc-800 text-white font-bold py-2.5 rounded-lg text-xs active:scale-95 transition hover:bg-zinc-700">加入紀錄</button>
               </div>
             </div>
 
             <div className="space-y-1.5">
               {todayItems.map(item => (
-                <div key={item.id} className="calm-card rounded-lg p-2.5 flex justify-between items-center text-xs">
+                <div key={item.id} className="calm-card rounded-lg p-2.5 flex justify-between items-center text-xs bg-white">
                   <div>
-                    <span className="font-bold text-stone-300 block">{item.name}</span>
-                    <span className="text-[10px] text-stone-500 font-mono">P:{item.p}g | C:{item.c}g | F:{item.f}g ➔ {item.kcal} kcal</span>
+                    <span className="font-bold text-zinc-800 block">{item.name}</span>
+                    <span className="text-[10px] text-zinc-500 font-mono">P:{item.p}g | C:{item.c}g | F:{item.f}g ➔ {item.kcal} kcal</span>
                   </div>
-                  <button onClick={() => setNutritionData(p => ({ ...p, [selectedDate]: p[selectedDate].filter(i => i.id !== item.id) }))} className="text-stone-600 hover:text-stone-400 p-1 text-xs transition">✕</button>
+                  <button onClick={() => setNutritionData(p => ({ ...p, [selectedDate]: p[selectedDate].filter(i => i.id !== item.id) }))} className="text-zinc-400 hover:text-zinc-600 p-1 text-xs transition">✕</button>
                 </div>
               ))}
-              {todayItems.length === 0 && <div className="text-center text-[11px] text-stone-600 py-6">此日尚未填寫飲食紀錄</div>}
+              {todayItems.length === 0 && <div className="text-center text-[11px] text-zinc-400 py-6">此日尚未填寫飲食紀錄</div>}
             </div>
           </div>
         );
@@ -298,7 +325,6 @@
         const [reps, setReps] = useState(10);
         const [sets, setSets] = useState(3);
 
-        // 休息計時器狀態
         const [timeLeft, setTimeLeft] = useState(0);
         const [timerActive, setTimerActive] = useState(false);
 
@@ -310,10 +336,7 @@
             }, 1000);
           } else if (timeLeft === 0 && timerActive) {
             setTimerActive(false);
-            // 觸發震動（若手機支援）
-            if ("vibrate" in navigator) {
-              try { navigator.vibrate([200, 100, 200, 100, 300]); } catch (e) {}
-            }
+            alert("⏱️ 休息時間到！請準備進行下一組訓練。");
           }
           return () => clearInterval(interval);
         }, [timerActive, timeLeft]);
@@ -346,7 +369,6 @@
           const newItem = { id: Date.now(), category, name: finalName, weight: parseFloat(weight), reps: parseInt(reps), sets: parseInt(sets) };
           setWorkoutsData(prev => ({ ...prev, [selectedDate]: [...(prev[selectedDate] || []), newItem] }));
           
-          // 紀錄完成後自動開始 90 秒休息計時器
           startTimer(90);
         };
 
@@ -354,31 +376,30 @@
 
         return (
           <div className="space-y-3 pb-4">
-            {/* 組間休息計時器面板 (無彈窗，行內顯示) */}
-            <div className={`calm-card rounded-xl p-3 flex items-center justify-between transition-colors ${timerActive ? 'border-stone-500/80 bg-stone-900/80' : ''}`}>
+            <div className={`calm-card rounded-xl p-3 flex items-center justify-between bg-white transition-colors ${timerActive ? 'border-zinc-400 bg-zinc-50' : ''}`}>
               <div className="flex items-center space-x-2">
                 <span className="text-xs">⏱️</span>
                 <div>
-                  <span className="text-[10px] text-stone-400 block uppercase tracking-wider">組間休息</span>
-                  <span className="text-sm font-mono font-bold text-stone-200">
-                    {timerActive ? `${Math.floor(timeLeft / 60)}:${String(timeLeft % 60).padStart(2, '0')}` : (timeLeft === 0 && timeLeft !== "" ? "計時完畢 (震動提醒)" : "就緒")}
+                  <span className="text-[10px] text-zinc-500 block uppercase tracking-wider">組間休息</span>
+                  <span className="text-sm font-mono font-bold text-zinc-800">
+                    {timerActive ? `${Math.floor(timeLeft / 60)}:${String(timeLeft % 60).padStart(2, '0')}` : "就緒"}
                   </span>
                 </div>
               </div>
               <div className="flex gap-1.5">
                 {!timerActive ? (
                   <>
-                    <button onClick={() => startTimer(60)} className="px-2.5 py-1 bg-stone-800 hover:bg-stone-700 rounded text-[11px] font-mono text-stone-300">60s</button>
-                    <button onClick={() => startTimer(90)} className="px-2.5 py-1 bg-stone-800 hover:bg-stone-700 rounded text-[11px] font-mono text-stone-300">90s</button>
-                    <button onClick={() => startTimer(120)} className="px-2.5 py-1 bg-stone-800 hover:bg-stone-700 rounded text-[11px] font-mono text-stone-300">120s</button>
+                    <button onClick={() => startTimer(60)} className="px-2.5 py-1 bg-zinc-100 hover:bg-zinc-200 rounded text-[11px] font-mono text-zinc-700 border border-zinc-200">60s</button>
+                    <button onClick={() => startTimer(90)} className="px-2.5 py-1 bg-zinc-100 hover:bg-zinc-200 rounded text-[11px] font-mono text-zinc-700 border border-zinc-200">90s</button>
+                    <button onClick={() => startTimer(120)} className="px-2.5 py-1 bg-zinc-100 hover:bg-zinc-200 rounded text-[11px] font-mono text-zinc-700 border border-zinc-200">120s</button>
                   </>
                 ) : (
-                  <button onClick={stopTimer} className="px-3 py-1 bg-stone-700 hover:bg-stone-600 rounded text-[11px] text-stone-200 font-bold">停止</button>
+                  <button onClick={stopTimer} className="px-3 py-1 bg-zinc-200 hover:bg-zinc-300 rounded text-[11px] text-zinc-800 font-bold">停止</button>
                 )}
               </div>
             </div>
 
-            <div className="calm-card rounded-xl p-3 space-y-2.5">
+            <div className="calm-card rounded-xl p-3 space-y-2.5 bg-white">
               <div className="grid grid-cols-2 gap-2">
                 <select value={category} onChange={e => setCategory(e.target.value)} className="calm-input p-2 rounded-lg text-xs">
                   {categories.map(c => <option key={c} value={c}>{c}</option>)}
@@ -395,39 +416,39 @@
 
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <span className="text-[9px] text-stone-500 block mb-0.5">重量(kg)</span>
+                  <span className="text-[9px] text-zinc-500 block mb-0.5">重量(kg)</span>
                   <select value={weight} onChange={e=>setWeight(e.target.value)} className="w-full calm-input p-2 rounded-lg text-xs font-mono">
                     {weightOptions.map(w => <option key={w} value={w}>{w}</option>)}
                   </select>
                 </div>
                 <div>
-                  <span className="text-[9px] text-stone-500 block mb-0.5">次數</span>
+                  <span className="text-[9px] text-zinc-500 block mb-0.5">次數</span>
                   <select value={reps} onChange={e=>setReps(e.target.value)} className="w-full calm-input p-2 rounded-lg text-xs font-mono">
                     {repsOptions.map(r => <option key={r} value={r}>{r}</option>)}
                   </select>
                 </div>
                 <div>
-                  <span className="text-[9px] text-stone-500 block mb-0.5">組數</span>
+                  <span className="text-[9px] text-zinc-500 block mb-0.5">組數</span>
                   <select value={sets} onChange={e=>setSets(e.target.value)} className="w-full calm-input p-2 rounded-lg text-xs font-mono">
                     {setsOptions.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
               </div>
 
-              <button onClick={handleAdd} className="w-full bg-stone-200 text-stone-950 font-bold py-2.5 rounded-lg text-xs active:scale-95 transition hover:bg-white">記錄訓練 (並開始 90s 休息)</button>
+              <button onClick={handleAdd} className="w-full bg-zinc-800 text-white font-bold py-2.5 rounded-lg text-xs active:scale-95 transition hover:bg-zinc-700">記錄訓練 (並開始 90s 休息)</button>
             </div>
 
             <div className="space-y-1.5">
               {todayItems.map(item => (
-                <div key={item.id} className="calm-card rounded-lg p-2.5 flex justify-between items-center text-xs">
+                <div key={item.id} className="calm-card rounded-lg p-2.5 flex justify-between items-center text-xs bg-white">
                   <div>
-                    <span className="font-bold text-stone-300 block">{item.name}</span>
-                    <span className="text-[10px] text-stone-500 font-mono">{item.weight} kg × {item.reps} 次 × {item.sets} 組 (容量: {item.weight * item.reps * item.sets}kg)</span>
+                    <span className="font-bold text-zinc-800 block">{item.name}</span>
+                    <span className="text-[10px] text-zinc-500 font-mono">{item.weight} kg × {item.reps} 次 × {item.sets} 組 (容量: {item.weight * item.reps * item.sets}kg)</span>
                   </div>
-                  <button onClick={() => setWorkoutsData(prev => ({ ...prev, [selectedDate]: prev[selectedDate].filter(i => i.id !== item.id) }))} className="text-stone-600 hover:text-stone-400 p-1 text-xs transition">✕</button>
+                  <button onClick={() => setWorkoutsData(prev => ({ ...prev, [selectedDate]: prev[selectedDate].filter(i => i.id !== item.id) }))} className="text-zinc-400 hover:text-zinc-600 p-1 text-xs transition">✕</button>
                 </div>
               ))}
-              {todayItems.length === 0 && <div className="text-center text-[11px] text-stone-600 py-6">此日尚未填寫訓練紀錄</div>}
+              {todayItems.length === 0 && <div className="text-center text-[11px] text-zinc-400 py-6">此日尚未填寫訓練紀錄</div>}
             </div>
           </div>
         );
@@ -435,9 +456,9 @@
 
       return (
         <div className="max-w-md mx-auto min-h-screen flex flex-col">
-          <header className="sticky top-0 z-20 bg-[#0c0a09]/90 backdrop-blur-md px-3 py-2.5 border-b border-stone-900 flex justify-between items-center">
-            <h1 className="text-sm font-bold tracking-tight text-stone-200">Eq.<span className="text-stone-400 font-normal">Track</span></h1>
-            <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} className="bg-stone-900 border border-stone-800 rounded-lg px-2 py-1 text-[11px] text-stone-300 font-mono outline-none" />
+          <header className="sticky top-0 z-20 bg-white/90 backdrop-blur-md px-3 py-2.5 border-b border-zinc-200 flex justify-between items-center shadow-xs">
+            <h1 className="text-sm font-bold tracking-tight text-zinc-800">Eq.<span className="text-zinc-500 font-normal">Track</span></h1>
+            <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} className="bg-zinc-100 border border-zinc-300 rounded-lg px-2 py-1 text-[11px] text-zinc-700 font-mono outline-none" />
           </header>
 
           <main className="flex-1 p-3 safe-bottom overflow-y-auto">
@@ -446,14 +467,14 @@
             {activeTab === "workout" && <WorkoutInput />}
           </main>
 
-          <nav className="fixed bottom-0 left-0 right-0 z-30 bg-[#0c0a09]/95 backdrop-blur-lg border-t border-stone-900">
+          <nav className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-lg border-t border-zinc-200">
             <div className="max-w-md mx-auto flex justify-around">
               {[
                 { id: "dashboard", label: "總覽" },
                 { id: "nutrition", label: "飲食" },
                 { id: "workout", label: "訓練" }
               ].map(tab => (
-                <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex-1 flex flex-col items-center py-3 transition ${activeTab === tab.id ? 'text-stone-100 font-bold border-t-2 border-stone-300' : 'text-stone-500 hover:text-stone-300'}`}>
+                <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex-1 flex flex-col items-center py-3 transition ${activeTab === tab.id ? 'text-zinc-900 font-bold border-t-2 border-zinc-800' : 'text-zinc-400 hover:text-zinc-600'}`}>
                   <span className="text-[11px] tracking-widest">{tab.label}</span>
                 </button>
               ))}
