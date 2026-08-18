@@ -38,10 +38,10 @@
       { id: 'HIGH_STRESS', label: '高皮質醇/壓力', badge: 'bg-indigo-950/80 text-indigo-300 border-indigo-800' }
     ];
 
-    // 選單選項目生成
-    const WEIGHT_OPTIONS = Array.from({ length: 75 }, (_, i) => (i + 1) * 2); // 2kg ~ 150kg
-    const REPS_OPTIONS = Array.from({ length: 30 }, (_, i) => i + 1); // 1 ~ 30 reps
-    const SETS_OPTIONS = Array.from({ length: 10 }, (_, i) => i + 1); // 1 ~ 10 sets
+    // 選單選項生成：重量改為 2.5kg 至 150kg（步長 2.5kg）
+    const WEIGHT_OPTIONS = Array.from({ length: 60 }, (_, i) => (i + 1) * 2.5);
+    const REPS_OPTIONS = Array.from({ length: 30 }, (_, i) => i + 1);
+    const SETS_OPTIONS = Array.from({ length: 10 }, (_, i) => i + 1);
 
     function calculateRollingAverages(records, days) {
       const validRecords = records.filter(r => r.weightKg !== null && r.weightKg !== undefined && !isNaN(r.weightKg));
@@ -122,7 +122,6 @@
       );
     }
 
-    // 推拉腿趨勢圖組件
     function WorkoutTrendChart({ records, category }) {
       const canvasRef = useRef(null);
       const chartRef = useRef(null);
@@ -198,13 +197,17 @@
       const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
       
       const [records, setRecords] = useState(() => {
-        const saved = localStorage.getItem('eq_records_v4');
-        return saved ? JSON.parse(saved) : [];
+        try {
+          const saved = localStorage.getItem('eq_records_v4');
+          return saved ? JSON.parse(saved) : [];
+        } catch(e) { return []; }
       });
 
       const [targets, setTargets] = useState(() => {
-        const saved = localStorage.getItem('eq_targets_v1');
-        return saved ? JSON.parse(saved) : { calories: 2200, protein: 160, carbs: 220, fat: 60 };
+        try {
+          const saved = localStorage.getItem('eq_targets_v1');
+          return saved ? JSON.parse(saved) : { calories: 2200, protein: 160, carbs: 220, fat: 60 };
+        } catch(e) { return { calories: 2200, protein: 160, carbs: 220, fat: 60 }; }
       });
 
       const [showTargetModal, setShowTargetModal] = useState(false);
@@ -213,7 +216,6 @@
       const [aiFoodInput, setAiFoodInput] = useState('');
       const [aiFoodLoading, setAiFoodLoading] = useState(false);
 
-      // 下拉式訓練選單 State
       const [selectedCategory, setSelectedCategory] = useState(Object.keys(WORKOUT_EXERCISES)[0]);
       const [selectedExercise, setSelectedExercise] = useState(WORKOUT_EXERCISES[Object.keys(WORKOUT_EXERCISES)[0]][0]);
       const [exWeight, setExWeight] = useState(20);
@@ -243,7 +245,7 @@
         } else {
           setDailyLog({ weight: '', tags: [], foods: [], workouts: [] });
         }
-      }, [selectedDate, records]);
+      }, [selectedDate]);
 
       const updateCurrentDateRecord = (fields) => {
         const updatedLog = { ...dailyLog, ...fields };
@@ -291,40 +293,51 @@
         return { volume: vol, count: dailyLog.workouts.length };
       }, [dailyLog.workouts]);
 
-      // AI 分析飲食 (gemini-1.5-flash)
+      // 修正後的 AI 自然語言分析（增加動態 JSON 正則擷取防錯與 MIME Type）
       const handleAnalyzeFoodAI = async () => {
         if (!aiFoodInput.trim()) return;
+        if (!apiKey.trim()) {
+          alert('請先在右上角輸入 Gemini API Key。');
+          return;
+        }
         setAiFoodLoading(true);
 
-        const prompt = `請分析食物：「${aiFoodInput}」，只輸出 JSON：{"name":"簡短名稱","calories":數字,"protein":數字,"carbs":數字,"fat":數字}`;
+        const prompt = `請分析食物：「${aiFoodInput}」，必須輸出 JSON 結構：{"name":"簡短名稱","calories":熱量數字,"protein":蛋白質數字,"carbs":碳水數字,"fat":脂肪數字}`;
 
         try {
-          if (apiKey) {
-            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey.trim()}`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-            });
-            const data = await res.json();
-            const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-            const clean = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-            const parsed = JSON.parse(clean);
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey.trim()}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { responseMimeType: "application/json" }
+            })
+          });
+          
+          if (!res.ok) throw new Error(`API Error: ${res.status}`);
+          
+          const data = await res.json();
+          const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          
+          // 強健解析：提取第一個 { 到最後一個 } 之間的 JSON 文字
+          const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+          if (!jsonMatch) throw new Error('解析格式失敗');
+          
+          const parsed = JSON.parse(jsonMatch[0]);
 
-            const newFood = {
-              id: 'f_' + Date.now(),
-              name: parsed.name || aiFoodInput,
-              calories: Math.round(parsed.calories || 0),
-              protein: Number((parsed.protein || 0).toFixed(1)),
-              carbs: Number((parsed.carbs || 0).toFixed(1)),
-              fat: Number((parsed.fat || 0).toFixed(1))
-            };
-            updateCurrentDateRecord({ foods: [...dailyLog.foods, newFood] });
-            setAiFoodInput('');
-          } else {
-            alert('請先在右上角輸入 Gemini API Key。');
-          }
+          const newFood = {
+            id: 'f_' + Date.now(),
+            name: parsed.name || aiFoodInput,
+            calories: Math.round(parsed.calories || 0),
+            protein: Number((parsed.protein || 0).toFixed(1)),
+            carbs: Number((parsed.carbs || 0).toFixed(1)),
+            fat: Number((parsed.fat || 0).toFixed(1))
+          };
+          
+          updateCurrentDateRecord({ foods: [...dailyLog.foods, newFood] });
+          setAiFoodInput('');
         } catch (e) {
-          alert('AI 解析失敗，請確認 API Key 是否有效。');
+          alert('AI 解析失敗，請確認 API Key 是否有效或稍後再試。');
         }
         setAiFoodLoading(false);
       };
@@ -371,17 +384,15 @@
             </div>
           </header>
 
-          {/* TAB 1: DASHBOARD (體重去噪 + 飲食/健身總結) */}
+          {/* TAB 1: DASHBOARD */}
           {activeTab === 'ANALYTICS' && (
             <div className="space-y-3">
               <AnalyticsChart data={[...records].sort((a,b)=>new Date(a.date)-new Date(b.date))} />
 
-              {/* 今日飲食與健身總結卡片 */}
               <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3 space-y-2">
                 <div className="text-xs font-semibold text-zinc-200">今日總結數據 ({selectedDate})</div>
                 
                 <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                  {/* 飲食總結 */}
                   <div className="bg-zinc-950 p-2.5 rounded-xl border border-zinc-800 space-y-1">
                     <div className="text-[10px] text-zinc-400 font-sans font-medium">🥗 飲食攝取剩餘</div>
                     <div className="text-emerald-400 font-bold">{targets.calories - consumedTotals.calories} kcal</div>
@@ -390,7 +401,6 @@
                     </div>
                   </div>
 
-                  {/* 健身總結 */}
                   <div className="bg-zinc-950 p-2.5 rounded-xl border border-zinc-800 space-y-1">
                     <div className="text-[10px] text-zinc-400 font-sans font-medium">🏋️ 訓練總容量</div>
                     <div className="text-amber-400 font-bold">{workoutTotals.volume} kg</div>
@@ -399,7 +409,6 @@
                 </div>
               </div>
 
-              {/* 裸測體重與標籤 */}
               <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3 space-y-2">
                 <div className="text-xs font-semibold text-zinc-200">當日裸測體重</div>
                 <input
@@ -508,11 +517,9 @@
             </div>
           )}
 
-          {/* TAB 3: WORKOUT (推拉腿趨勢 + 全下拉式選單) */}
+          {/* TAB 3: WORKOUT */}
           {activeTab === 'WORKOUT' && (
             <div className="space-y-3">
-              
-              {/* 推拉腿進步趨勢圖 */}
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-semibold text-zinc-200">推拉腿進步趨勢</span>
@@ -531,7 +538,6 @@
                 <WorkoutTrendChart records={records} category={trendCategory} />
               </div>
 
-              {/* 下拉式選單輸入 */}
               <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3 space-y-2">
                 <div className="text-xs font-semibold text-zinc-200">新增訓練組數</div>
                 
@@ -567,7 +573,6 @@
                   </div>
                 </div>
 
-                {/* 重量、次數、組數 全下拉選單 */}
                 <div className="grid grid-cols-3 gap-1.5 font-mono pt-1">
                   <div>
                     <label className="text-[10px] text-zinc-400 font-sans">重量 (kg)</label>
@@ -614,7 +619,6 @@
                 </button>
               </div>
 
-              {/* 今日訓練紀錄 */}
               <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3 space-y-2">
                 <div className="text-xs font-semibold text-zinc-300">今日訓練紀錄</div>
                 {dailyLog.workouts.length === 0 ? (
